@@ -28,7 +28,7 @@ TBD
 
 1. [COS instance creation](#1-cos-instance-creation)
    1. 1 [Creating HMAC credential](#11-creating-hmac-credential)
-2. [Node API Setup](#2-node-api-setup)
+2. [Node Setup](#2-node-setup)
 
 ## 1. COS instance creation
 
@@ -64,7 +64,7 @@ Then on the "Create credential" modal, name your credential, click on the "Advan
 
 Later we are coming back here to copy the contents of the created credential and paste it in our `~/server/.bluemix/cos_credentials` file to be used by the node.js API.
 
-## 2. Node API setup
+## 2. Node setup
 
 Create a folder for your server and then create a package.json using `npm init`. I'm using the `esm --yes` option so we can use `import/export` syntax:
 
@@ -87,11 +87,49 @@ Now we are going to install the dependencies:
 
 - [Express](https://expressjs.com/) - to create the API
 - [IBM COS SDK for Node.js](https://www.npmjs.com/package/ibm-cos-sdk) - to easily connect to our COS instance
+- [Nodemon](https://www.npmjs.com/package/nodemon) - to help in development, automatically restarts the node app when file changes.
   
 ```
-$ npm install --save express ibm-cos-sdk
+$ npm i -S express ibm-cos-sdk && npm i -S -D nodemon
+```
+Then add the following line to the `scripts` section of your `package.json` file:
+
+```json
+"dev": "nodemon index.js"
 ```
 
+Your `package.json` file should look something like this:
+
+```json
+{
+  "name": "server",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "module": "main.js",
+  "scripts": {
+    "dev": "nodemon index.js",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "esm": "^3.2.25",
+    "express": "^4.17.1",
+    "ibm-cos-sdk": "^1.9.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.6"
+  }
+}
+```
+
+## 3. Express API setup
+
+### 3.1 **/download** route
+
+### 3.2 **/upload** route
 
 # References
 
