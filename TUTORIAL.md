@@ -58,7 +58,7 @@ Then on the "Create credential" modal, name your credential, click on the "Advan
 
 ![HMAC credential modal](images/7-hmac-modal.png)
 
-Later we are coming back here to copy the contents of the created credential and paste it in a `.env` file to be used by the node.js API.
+Later we are coming back here to copy the contents of the created credential and paste it in our `~/server/.bluemix/cos_credentials` file to be used by the node.js API.
 
 ## 2. Node API setup
 
