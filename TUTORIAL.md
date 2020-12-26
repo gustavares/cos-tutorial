@@ -22,6 +22,10 @@ TBD
 
 # Steps
 
+1. [COS instance creation](#1-cos-instance-creation)
+   1. 1 [Creating HMAC credential](#11-creating-hmac-credential)
+2. [Node API Setup](#2-node-api-setup)
+
 ## 1. COS instance creation
 
 Once logged into your IBM Cloud account, type *"Object Storage"* in the search bar at the top and select the Object Storage item or follow this link: [https://cloud.ibm.com/objectstorage/create](https://cloud.ibm.com/objectstorage/create). 
@@ -42,7 +46,7 @@ Leave the "Create bucket with credentials" option selected, give your bucket a n
 
 ![Bucket naming](images/5-bucket-naming.png)
 
-## 2. Creating HMAC Credential
+### 1.1 Creating HMAC Credential
 
 To be able to use presigned URLs we need an [HMAC credential](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-uhc-hmac-credentials-main).
 
@@ -55,6 +59,15 @@ Then on the "Create credential" modal, name your credential, click on the "Advan
 ![HMAC credential modal](images/7-hmac-modal.png)
 
 Later we are coming back here to copy the contents of the created credential and paste it in a `.env` file to be used by the node.js API.
+
+## 2. Node API setup
+
+Create a folder for your server and then create a package.json using `npm init`. I'm using the `esm --yes` option so we can use `import/export` syntax:
+
+```
+$ mkdir server && cd server
+$ npm init esm --yes
+```
 
 # References
 
