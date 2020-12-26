@@ -5,6 +5,10 @@ The problem with this approach is that may you end up with a bottleneck that cau
 You can boost up the performance if the client side could upload directly to the storage service.
 To achieve this you can use [*IBM Cloud Object Storage*(COS)](https://cloud.ibm.com/docs/cloud-object-storage) service. It uses a subset of the [S3 API](https://cloud.ibm.com/docs/cloud-object-storage/api-reference?topic=cloud-object-storage-compatibility-api), which includes the [**presigned URL**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url) feature. A presigned URL is a temporary link generated from your COS credentials that you can send to clients so they can do operations to specific objects without authentication. The client can use the URL retrieved from the server to upload/download files directly to/from a *bucket* at your COS instance.
 
+The following image shows a simple architecture drawing, the one in the left is what is usually done and the one in the right is what we are going to build:
+
+![Architecture](images/1-architecture.png)
+
 In this tutorial you will: 
 - Setup a COS instance to store your files. 
 - Build a [**Node.js API**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-node) to retrieve presigned URLs from the COS instance using your credentials.
