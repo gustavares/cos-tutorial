@@ -14,5 +14,8 @@
     "esm": "^3.2.25",
     "express": "^4.17.1",
     "ibm-cos-sdk": "^1.9.0"
+  },
+  "devDependencies": {
+    "nodemon": "^2.0.6"
   }
 }
