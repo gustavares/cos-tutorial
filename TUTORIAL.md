@@ -127,6 +127,32 @@ Your `package.json` file should look something like this:
 
 ## 3. Express API setup
 
+Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and setup our server to listen on port `3030`. We are also adding a `/` route just for health check.
+
+```javascript
+// ESM syntax is supported.
+import express from 'express';
+
+const PORT = 3030;
+
+const app = express();
+
+app.use('/', (req, res) => res.json('API is up and running!'));
+
+app.listen(PORT, () => {
+    console.log(`API listening on port ${PORT}`);
+});
+
+```
+
+After saving your file, you can open up a terminal and navigate to your `server` directory and type: 
+
+```
+$ npm run dev
+```
+
+If everything is right, you will see the text `API listening on port 3030` on your console, and everytime you save a file you will see that the server restarts.
+
 ### 3.1 **/download** route
 
 ### 3.2 **/upload** route
