@@ -10,6 +10,12 @@ In this tutorial you will:
 - Build a [**Node.js API**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-node) to retrieve presigned URLs from the COS instance using your credentials.
 - Build a simple front-end Javascript app to consume the API and upload files to COS using the presigned URLs.
 
+# Prerequisites
+
+- [Node.js and npm](https://nodejs.org/en/) installations. I'm using node 14.15.3 version and npm 6.14.9 version.
+- An [IBM Cloud account](https://cloud.ibm.com/registration).
+- A text editor. I'm using [VSCode](https://code.visualstudio.com/).
+  
 # References
 
 Creating a presigned URL - [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url)
