@@ -16,6 +16,46 @@ In this tutorial you will:
 - An [IBM Cloud account](https://cloud.ibm.com/registration).
 - A text editor. I'm using [VSCode](https://code.visualstudio.com/).
   
+# Estimated time
+
+TBD
+
+# Steps
+
+## 1. COS instance creation
+
+Once logged into your IBM Cloud account, type *"Object Storage"* in the search bar at the top and select the Object Storage item or follow this link: [https://cloud.ibm.com/objectstorage/create](https://cloud.ibm.com/objectstorage/create). 
+
+While at the creation screen, leave the "Lite" plan selected, scroll down to give your instance a name, and then click on the "Create" button on the right.
+
+![COS creation](images/2-cos-creation.png)
+
+When inside your COS instance, click on the "Buckets" item in the left, then in the "Create bucket +" button to the right.
+
+![Bucket creation](images/3-bucket-creation.png)
+
+Now, on the create bucket screen select the "Quickly get started" option clicking in the arrow pointing right.
+
+![Bucket select](images/4-bucket-select.png)
+
+Leave the "Create bucket with credentials" option selected, give your bucket a name and click "Next" two times, scroll all the way down and click on the "View bucket configuration" button.
+
+![Bucket naming](images/5-bucket-naming.png)
+
+## 2. Creating HMAC Credential
+
+To be able to use presigned URLs we need an [HMAC credential](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-uhc-hmac-credentials-main).
+
+Click on the "Service credentials" item to the left, then on the "New credential +" button to the right.
+
+![Credential creation](images/6-hmac-creation.png)
+
+Then on the "Create credential" modal, name your credential, click on the "Advance options" button, turn on the "Include HMAC Credential" option, and then click on the "Add" button.
+
+![HMAC credential modal](images/7-hmac-modal.png)
+
+Later we are coming back here to copy the contents of the created credential and paste it in a `.env` file to be used by the node.js API.
+
 # References
 
 Creating a presigned URL - [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url)
