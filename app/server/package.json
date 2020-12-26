@@ -11,6 +11,8 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "esm": "^3.2.25"
+    "esm": "^3.2.25",
+    "express": "^4.17.1",
+    "ibm-cos-sdk": "^1.9.0"
   }
 }

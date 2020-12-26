@@ -69,6 +69,14 @@ $ mkdir server && cd server
 $ npm init esm --yes
 ```
 
+Now we are going to install the following dependencies: 
+
+- [Express](https://expressjs.com/) - to create the API
+- [IBM COS SDK for Node.js](https://www.npmjs.com/package/ibm-cos-sdk) - to easily connect to our COS instance
+  
+```
+$ npm install --save express ibm-cos-sdk
+```
 # References
 
 Creating a presigned URL - [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url)
