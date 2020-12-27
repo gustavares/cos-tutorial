@@ -1,4 +1,7 @@
 import { S3, Credentials } from 'ibm-cos-sdk';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export const cos = new S3({
     endpoint: process.env.COS_ENDPOINT,
