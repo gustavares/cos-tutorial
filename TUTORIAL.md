@@ -129,10 +129,11 @@ Now we are going to install the dependencies:
 
 - [Express](https://expressjs.com/) - to create the API
 - [IBM COS SDK for Node.js](https://www.npmjs.com/package/ibm-cos-sdk) - to easily connect to our COS instance
+- [dotenv](https://www.npmjs.com/package/dotenv) - to read environment variables from `.env` file
 - [Nodemon](https://www.npmjs.com/package/nodemon) - to help in development, automatically restarts the node app when file changes.
   
 ```
-$ npm i -S express ibm-cos-sdk && npm i -S -D nodemon
+$ npm i -S express ibm-cos-sdk dotenv && npm i -S -D nodemon
 ```
 Then add the following line to the `scripts` section of your `package.json` file:
 
@@ -157,6 +158,7 @@ Your `package.json` file should look something like this:
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "dotenv": "^8.2.0",
     "esm": "^3.2.25",
     "express": "^4.17.1",
     "ibm-cos-sdk": "^1.9.0"
@@ -173,13 +175,16 @@ In order to use the presigned URL feature, first we need to enable CORS requests
 
 #### 2.1.1 Configuring the COS connection object
 
-- Open the `cos.js` file and import `S3` and `Credentials` classes from the `ibm-cos-sdk`.
+- Open the `cos.js` file and import `S3` and `Credentials` classes from the `ibm-cos-sdk` and the `dotenv` module.
 - Instantiate and export an object called `cos` that receveis an instance of the `S3` class, passing a config object to the constructor like below.
   
 This file will also holds the functions to get the presigned URLs and will be used by our API.
 ```javascript
 // cos.js
 import { S3, Credentials } from 'ibm-cos-sdk';
+import dotenv from 'dotenv';
+
+dotenv.config();
 
 export const cos = new S3({
     endpoint: process.env.COS_ENDPOINT,
@@ -236,7 +241,12 @@ Now you can open your terminal and navigate to your `server` directory and run t
 ```
 $ node -r esm bucketCorsConfig.js
 ```
- 
+
+If everything was alright you will see the following message in the console:
+```
+[OBJECT STORAGE] Configured CORS for [name of your bucket]
+```
+
 ## 3. Express API setup
 
 Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and setup our server to listen on port `3030`. We are also adding a `/` route just for health check.
