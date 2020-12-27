@@ -179,8 +179,9 @@ Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-p
 Now let's create our route to get an URL to download files. In the `routes.js` file:
 - Import the `Router` class from `expresss` and the `cos.js` file. 
 - Instatiate an object `router`, and call the `.use` method from it to create a `/download` route with an `async` handler function with the `req`, `res`, `next` parameters. 
+- From the `req` object get the `params` `bucket` and `fileName`.
 - Inside the handler function, create a `try/catch` block.
-- In the `try` block call the function `getPresignedDownloadUrl` from the `cos` module, passing the `bucketName` and `fileName` to it. We will implement it later.
+- In the `try` block call the function `getPresignedDownloadUrl` from the `cos` module, passing the `bucket` and `fileName` to it. We will implement it later.
 - In the `catch` block just send the error to the `next` middleware.
 - Lastly, at the end of the file export a variable called `presignedRoutes` that receives the `router` object.
 
@@ -191,8 +192,10 @@ import cos from './cos';
 const router = Router();
 
 router.use('/download', async (req, res, next) => {
+    const { bucket, fileName } = req.params;
+
     try {
-        const url = await cos.getPresignedDownloadUrl();
+        const url = await cos.getPresignedDownloadUrl(bucket, fileName);
 
         return res.status(200).json({ url });
     } catch(e) {

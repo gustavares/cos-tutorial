@@ -5,8 +5,10 @@ const router = Router();
 
 
 router.use('/download', async (req, res, next) => {
+    const { bucket, fileName } = req.params;
+
     try {
-        const url = await cos.getPresignedDownloadUrl();
+        const url = await cos.getPresignedDownloadUrl(bucket, fileName);
 
         return res.status(200).json({ url });
     } catch(e) {
