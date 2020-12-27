@@ -6,7 +6,7 @@ const PORT = 3030;
 
 const app = express();
 
-app.use('/', (req, res) => res.json('API is up and running!'));
+app.use('/health', (req, res) => res.json('API is up and running!'));
 
 app.use('/api/presigned', presignedRoutes);
 

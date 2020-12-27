@@ -249,7 +249,7 @@ If everything was alright you will see the following message in the console:
 
 ## 3. Express API setup
 
-Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and setup our server to listen on port `3030`. We are also adding a `/` route just for health check.
+Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and setup our server to listen on port `3030`. We are also adding a `/health` route just for health check.
 
 ```javascript
 // ESM syntax is supported.
@@ -259,7 +259,7 @@ const PORT = 3030;
 
 const app = express();
 
-app.use('/', (req, res) => res.json('API is up and running!'));
+app.use('/health', (req, res) => res.json('API is up and running!'));
 
 app.listen(PORT, () => {
     console.log(`API listening on port ${PORT}`);
@@ -296,7 +296,7 @@ Now let's create our route to get an URL to download files. In the `routes.js` f
 
 ```javascript
 import { Router } from 'express';
-import cos from './cos';
+import { getPresignedDownloadUrl } from './cos';
 
 const router = Router();
 
@@ -304,7 +304,7 @@ router.use('/download', async (req, res, next) => {
     const { bucket, fileName } = req.params;
 
     try {
-        const url = await cos.getPresignedDownloadUrl(bucket, fileName);
+        const url = await getPresignedDownloadUrl(bucket, fileName);
 
         return res.status(200).json({ url });
     } catch(e) {

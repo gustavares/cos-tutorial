@@ -1,7 +1,9 @@
 import { S3, Credentials } from 'ibm-cos-sdk';
 import dotenv from 'dotenv';
+const URL_EXPIRATION_TIME = 60 * 5;
 
 dotenv.config();
+
 
 export const cos = new S3({
     endpoint: process.env.COS_ENDPOINT,
@@ -15,3 +17,13 @@ export const cos = new S3({
     ),
     signatureVersion: 'v4'
 });
+
+export async function getPresignedDownloadUrl(bucket, fileName) {
+    const url = await cos.getSignedUrl('getObject', {
+        Bucket: bucket,
+        Key: fileName,
+        Expires: URL_EXPIRATION_TIME,
+    });
+
+    return url;
+}
