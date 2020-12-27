@@ -83,6 +83,19 @@ server
 └── package-lock.json
 ```
 
+Then create the two extra files that we are going to need later: `routes.js` and `cos.js`:
+
+```
+server
+|
+└── index.js  // requires ESM modules and calls 'main.js'
+└── main.js   // app start and express config
+└── package.json
+└── package-lock.json
+└── routes.js // holds our API routes
+└── cos.js    // handles everything related to COS
+```
+
 Now we are going to install the dependencies: 
 
 - [Express](https://expressjs.com/) - to create the API
@@ -153,8 +166,44 @@ $ npm run dev
 
 If everything is right, you will see the text `API listening on port 3030` on your console, and everytime you save a file you will see that the server restarts.
 
+*NOTE: This is a configuration intended only for the purposes of this tutorial and should not be used in production. Please follow the best practices described in the Express website cited below if you intend to deploy it to a production environment.*
+
+**Express Production Best Practices**
+
+Security - [https://expressjs.com/en/advanced/best-practice-security.html](https://expressjs.com/en/advanced/best-practice-security.html)
+
+Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-performance.html](https://expressjs.com/en/advanced/best-practice-performance.html)
+    
 ### 3.1 **/download** route
 
+Now let's create our route to get an URL to download files. In the `routes.js` file:
+- Import the `Router` class from `expresss` and the `cos.js` file. 
+- Instatiate an object `router`, and call the `.use` method from it to create a `/download` route with an `async` handler function with the `req`, `res`, `next` parameters. 
+- Inside the handler function, create a `try/catch` block.
+- In the `try` block call the function `getPresignedDownloadUrl` from the `cos` module, passing the `bucketName` and `fileName` to it. We will implement it later.
+- In the `catch` block just send the error to the `next` middleware.
+- Lastly, at the end of the file export a variable called `presignedRoutes` that receives the `router` object.
+
+```javascript
+import { Router } from 'express';
+import cos from './cos';
+
+const router = Router();
+
+router.use('/download', async (req, res, next) => {
+    try {
+        const url = await cos.getPresignedDownloadUrl();
+
+        return res.status(200).json({ url });
+    } catch(e) {
+        next(e);
+    }    
+});
+
+export const presignedRoutes = router;
+```
+
+For now th
 ### 3.2 **/upload** route
 
 # References
