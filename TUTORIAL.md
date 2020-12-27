@@ -331,8 +331,8 @@ export async function getPresignedDownloadUrl(bucket, fileName) {
 
 We are using the `getSignedUrl` method from the `ibm-cos-sdk`, the first parameter we determine the type of operation that the generated URL will be able to do, in this case we are using `getObject`, a `GET` operation to download an object. The second parameter is an options object with:
 
-    - `Bucket`: [the bucket name]
-    - `Key: [the file name]
+    - Bucket: [the bucket name]
+    - Key: [the file name]
 
 You can also pass an `Expires` option to determine how long the URL will live, if no value is passed it defaults to 900 seconds(15 minutes). Read more about the `getSignedUrl` method: [https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property](https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property)
 
