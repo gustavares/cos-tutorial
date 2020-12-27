@@ -19,6 +19,8 @@ In this tutorial you will:
 - [Node.js and npm](https://nodejs.org/en/) installations. I'm using node 14.15.3 version and npm 6.14.9 version.
 - An [IBM Cloud account](https://cloud.ibm.com/registration).
 - A text editor. I'm using [VSCode](https://code.visualstudio.com/).
+
+You can find the entire code created for the tutorial in this repo [https://github.com/gustavares/cos-tutorial/](https://github.com/gustavares/cos-tutorial/)
   
 # Estimated time
 
@@ -62,7 +64,7 @@ Then on the "Create credential" modal, name your credential, click on the "Advan
 
 ![HMAC credential modal](images/7-hmac-modal.png)
 
-Later we are coming back here to copy the contents of the created credential and paste it in our `~/server/.bluemix/cos_credentials` file to be used by the node.js API.
+Later we are coming back here to copy the contents of the created credential and paste it in our `.env` file.
 
 ## 2. Node setup
 
@@ -83,7 +85,7 @@ server
 └── package-lock.json
 ```
 
-Then create the two extra files that we are going to need later: `routes.js` and `cos.js`:
+Then create the three extra files that we are going to need later: `routes.js`, `cos.js`, and `.env`:
 
 ```
 server
@@ -94,7 +96,35 @@ server
 └── package-lock.json
 └── routes.js // holds our API routes
 └── cos.js    // handles everything related to COS
+└── .env      // holds our environment variables
 ```
+### 2.1 COS environment variables
+
+Open the `.env` file and create the following variables and copy the correspondent values from the HMAC credential created earlier.
+
+```
+COS_URL=
+COS_ENDPOINT=
+COS_APIKEYID=
+COS_IBMAUTHENDPOINT=
+COS_SERVICEINSTANCEID=
+COS_HMAC_ACCESS_KEY_ID=
+COS_HMAC_SECRET_ACCESS_KEY=
+```
+
+You can find these values in your COS instance on IBM Cloud, clicking on the "Service credentials" item on the left.
+
+![HMAC copy](images/8-hmac-copy.png)
+
+*NOTE: This might be obvious but never expose your credentials! Don't forget to add the .env file to .gitignore.*
+
+#### 2.1.1 Getting the **COS_ENDPOINT** variable value
+
+- Back in your COS instance, click in the **"Buckets"** item on the left, then click in the bucket we created earlier.
+- On the left again, click in the **"Configuration"** item and scroll down to find the **"Endpoints"** section.
+- Copy the **"Public"** url to your clipboard.
+  ![Endpoint copy](images/9-endpoint-copy.png)
+- Back in your text editor, in the `.env` file, paste the endpoint value for the `COS_ENDPOINT` variable.
 
 Now we are going to install the dependencies: 
 
@@ -138,6 +168,74 @@ Your `package.json` file should look something like this:
 }
 ```
 
+### 2.1 Enabling CORS requests to our bucket
+
+In order to use the presigned URL feature, first we need to enable CORS requests to our bucket. To do this we will write a simple script that will send a CORS configuration object to our bucket using the `ibm-cos-sdk`.
+
+#### 2.1.1 Configuring the COS connection object
+
+- Open the `cos.js` file and import `S3` and `Credentials` classes from the `ibm-cos-sdk`.
+- Instantiate and export an object called `cos` that receveis an instance of the `S3` class, passing a config object to the constructor like below.
+  
+```javascript
+// cos.js
+import { S3, Credentials } from 'ibm-cos-sdk';
+
+export const cos = new S3({
+    endpoint: process.env.COS_ENDPOINT,
+    apiKeyId: process.env.COS_APIKEYID,
+    ibmAuthEndpoint: process.env.COS_IBMAUTHENDPOINT,
+    serviceInstanceId: process.env.COS_SERVICEINSTANCEID,
+    credentials: new Credentials(
+        process.env.COS_HMAC_ACCESS_KEY_ID, 
+        process.env.COS_HMAC_SECRET_ACCESS_KEY,
+        null
+    ),
+    signatureVersion: 'v4'
+});
+```
+
+#### 2.1.2 Creating the script
+
+- Create a file called `bucketCorsConfig.js` under the `server` folder.
+- Import the `cos` object from the `cos.js` module.
+- Create the `enableCorsRequests` async function, copy the implementation from below. This function sends a configuration object that enables `PUT` requests from any origins to the provided bucket. [Here](https://cloud.ibm.com/docs/cloud-object-storage-cli-plugin?topic=cloud-object-storage-cli-plugin-ic-cos-cli#ic-set-bucket-cors) you can read about the `putBucketBucketCors` method we used.
+- Lastly, at the end of the file call the created method passing your bucket name, mine is `cos-tutorial-presigned`.
+  
+```javascript
+// bucketCorsConfig.js
+import { cos } from './cos';
+
+async function enableCorsRequests(bucketName) {
+    try {
+        const data = await cos.putBucketCors({
+            Bucket: bucketName,
+            CORSConfiguration: {
+                CORSRules: [
+                    {
+                        'AllowedMethods': ['PUT'],
+                        'AllowedOrigins': ['*'],
+                        'AllowedHeaders': ['*']
+                    }
+                ],
+            }
+        }).promise();
+    } catch(e) {
+        console.error(`[OBJECT STORAGE] ERROR: ${e.code} - ${e.message}\n`);
+        return false;
+    }
+
+    console.log(`[OBJECT STORAGE] Configured CORS for ${bucketName}`);
+    return true;
+}
+
+enableCorsRequests('cos-tutorial-presigned');
+```
+
+Now you can open your terminal and navigate to your `server` directory and run the script with the following command:
+```
+$ node -r esm bucketCorsConfig.js
+```
 ## 3. Express API setup
 
 Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and setup our server to listen on port `3030`. We are also adding a `/` route just for health check.
@@ -206,7 +304,6 @@ router.use('/download', async (req, res, next) => {
 export const presignedRoutes = router;
 ```
 
-For now th
 ### 3.2 **/upload** route
 
 # References
