@@ -103,13 +103,12 @@ server
 Open the `.env` file and create the following variables and copy the correspondent values from the HMAC credential created earlier.
 
 ```
-COS_URL=
-COS_ENDPOINT=
-COS_APIKEYID=
-COS_IBMAUTHENDPOINT=
-COS_SERVICEINSTANCEID=
-COS_HMAC_ACCESS_KEY_ID=
-COS_HMAC_SECRET_ACCESS_KEY=
+COS_ENDPOINT=<endpoint> // check the next section to get this value
+COS_APIKEYID=<api-key>
+COS_IBM_AUTH_ENDPOINT=https://iam.cloud.ibm.com/identity/token
+COS_RESOURCE_INSTANCE_ID=<resource-instance-id>
+COS_HMAC_ACCESS_KEY_ID=<access_key_id>
+COS_HMAC_SECRET_ACCESS_KEY=<secret_access_key>
 ```
 
 You can find these values in your COS instance on IBM Cloud, clicking on the "Service credentials" item on the left.
@@ -177,6 +176,7 @@ In order to use the presigned URL feature, first we need to enable CORS requests
 - Open the `cos.js` file and import `S3` and `Credentials` classes from the `ibm-cos-sdk`.
 - Instantiate and export an object called `cos` that receveis an instance of the `S3` class, passing a config object to the constructor like below.
   
+This file will also holds the functions to get the presigned URLs and will be used by our API.
 ```javascript
 // cos.js
 import { S3, Credentials } from 'ibm-cos-sdk';
@@ -184,8 +184,8 @@ import { S3, Credentials } from 'ibm-cos-sdk';
 export const cos = new S3({
     endpoint: process.env.COS_ENDPOINT,
     apiKeyId: process.env.COS_APIKEYID,
-    ibmAuthEndpoint: process.env.COS_IBMAUTHENDPOINT,
-    serviceInstanceId: process.env.COS_SERVICEINSTANCEID,
+    ibmAuthEndpoint: process.env.COS_IBM_AUTH_ENDPOINT,
+    serviceInstanceId: process.env.COS_RESOURCE_INSTANCE_ID,
     credentials: new Credentials(
         process.env.COS_HMAC_ACCESS_KEY_ID, 
         process.env.COS_HMAC_SECRET_ACCESS_KEY,
@@ -236,6 +236,7 @@ Now you can open your terminal and navigate to your `server` directory and run t
 ```
 $ node -r esm bucketCorsConfig.js
 ```
+ 
 ## 3. Express API setup
 
 Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and setup our server to listen on port `3030`. We are also adding a `/` route just for health check.
@@ -279,7 +280,7 @@ Now let's create our route to get an URL to download files. In the `routes.js` f
 - Instatiate an object `router`, and call the `.use` method from it to create a `/download` route with an `async` handler function with the `req`, `res`, `next` parameters. 
 - From the `req` object get the `params` `bucket` and `fileName`.
 - Inside the handler function, create a `try/catch` block.
-- In the `try` block call the function `getPresignedDownloadUrl` from the `cos` module, passing the `bucket` and `fileName` to it. We will implement it later.
+- In the `try` block call the function `getPresignedDownloadUrl` from the `cos` module, passing the `bucket` and `fileName` to it, we are going to implement it right next to this section.
 - In the `catch` block just send the error to the `next` middleware.
 - Lastly, at the end of the file export a variable called `presignedRoutes` that receives the `router` object.
 
@@ -303,6 +304,8 @@ router.use('/download', async (req, res, next) => {
 
 export const presignedRoutes = router;
 ```
+
+Implementing the `getPresignedDownloadUrl` function.
 
 ### 3.2 **/upload** route
 
