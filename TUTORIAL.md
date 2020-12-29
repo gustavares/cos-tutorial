@@ -440,6 +440,20 @@ app.listen(PORT, () => {
 
 That's it for the API, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/).
 
+## Front-end application
+
+In the front-end we will have two sections, one being a form to select a file from your file system and the other a list of the files in the bucket. We will use the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) to make all the HTTP requests.
+
+Nowadays, a common approach to architecture is to separate the front-end from the back-end, but for the purpose of this tutorial we are going to make our node app serve an `index.html` file. In a bigger context it would make sense to have this API living by itself as a microservice just to generate the COS URLs.
+
+To do:
+- serve index.html
+- api requests to generate urls
+- requests using the urls
+- request to fetch file list
+- html form to upload file
+- html file list
+
 # References
 
 Creating a presigned URL - [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url)
