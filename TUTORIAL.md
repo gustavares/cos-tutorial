@@ -28,23 +28,20 @@ TBD
 
 # Steps
 
-- [File upload to IBM Cloud Object Storage directly from the browser. Great upload performance.](#file-upload-to-ibm-cloud-object-storage-directly-from-the-browser-great-upload-performance)
-- [Prerequisites](#prerequisites)
-- [Estimated time](#estimated-time)
-- [Steps](#steps)
-  - [1. COS instance creation](#1-cos-instance-creation)
-    - [1.1 Creating HMAC Credential](#11-creating-hmac-credential)
-  - [2. Node setup](#2-node-setup)
-    - [2.1 COS environment variables](#21-cos-environment-variables)
-      - [2.1.1 Getting the **COS_ENDPOINT** variable value](#211-getting-the-cos_endpoint-variable-value)
-    - [2.2 Enabling CORS requests to our bucket](#22-enabling-cors-requests-to-our-bucket)
-      - [2.2.1 Configuring the COS connection object](#221-configuring-the-cos-connection-object)
-      - [2.2.2 Creating the script](#222-creating-the-script)
-  - [3. Express API setup](#3-express-api-setup)
-    - [3.1 getPresignedUrl function](#31-getpresignedurl-function)
-    - [3.2 Routes](#32-routes)
-      - [3.2.1 /upload](#321-upload)
-      - [3.2.2 **/download**](#322-download)
+<!-- no toc -->
+- [1. COS instance creation](#1-cos-instance-creation)
+  - [1.1 Creating HMAC Credential](#11-creating-hmac-credential)
+- [2. Node setup](#2-node-setup)
+  - [2.1 COS environment variables](#21-cos-environment-variables)
+    - [2.1.1 Getting the **COS_ENDPOINT** variable value](#211-getting-the-cos_endpoint-variable-value)
+  - [2.2 Enabling CORS requests to our bucket](#22-enabling-cors-requests-to-our-bucket)
+    - [2.2.1 Configuring the COS connection object](#221-configuring-the-cos-connection-object)
+    - [2.2.2 Creating the script](#222-creating-the-script)
+- [3. Express API setup](#3-express-api-setup)
+  - [3.1 getPresignedUrl function](#31-getpresignedurl-function)
+  - [3.2 Routes](#32-routes)
+    - [3.2.1 /upload](#321-upload)
+    - [3.2.2 /download](#322-download)
 - [References](#references)
         
 
@@ -382,7 +379,7 @@ Lastly, at the end of the file export a variable called `presignedRoutes` that r
 
 In the `cos.js` file, let's create and export an async function called `getPresignedDownloadUrl` function: 
 
-#### 3.2.2 **/download**
+#### 3.2.2 /download
 
 Under the `/upload` route create the `/download` route, your `routes.js` file should look like this:
 
