@@ -16,8 +16,8 @@ export const cos = new S3({
     signatureVersion: 'v4'
 });
 
-export async function getPresignedDownloadUrl(bucket, fileName) {
-    const url = await cos.getSignedUrl('getObject', {
+export async function getPresignedUrl(bucket, fileName, operation) {
+    const url = await cos.getSignedUrl(operation, {
         Bucket: bucket,
         Key: fileName,
     });
