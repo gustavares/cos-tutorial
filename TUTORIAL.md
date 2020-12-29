@@ -277,7 +277,6 @@ app.use('/health', (req, res) => res.json('API is up and running!'));
 app.listen(PORT, () => {
     console.log(`API listening on port ${PORT}`);
 });
-
 ```
 
 After saving your file, you can open up a terminal and navigate to your `server` directory and type: 
@@ -437,8 +436,8 @@ app.use('/api/presigned', presignedRoutes);
 app.listen(PORT, () => {
     console.log(`API listening on port ${PORT}`);
 });
-
 ```
+
 That's it for the API, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/).
 
 # References
