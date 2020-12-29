@@ -28,9 +28,25 @@ TBD
 
 # Steps
 
-1. [COS instance creation](#1-cos-instance-creation)
-   1. 1 [Creating HMAC credential](#11-creating-hmac-credential)
-2. [Node Setup](#2-node-setup)
+- [File upload to IBM Cloud Object Storage directly from the browser. Great upload performance.](#file-upload-to-ibm-cloud-object-storage-directly-from-the-browser-great-upload-performance)
+- [Prerequisites](#prerequisites)
+- [Estimated time](#estimated-time)
+- [Steps](#steps)
+  - [1. COS instance creation](#1-cos-instance-creation)
+    - [1.1 Creating HMAC Credential](#11-creating-hmac-credential)
+  - [2. Node setup](#2-node-setup)
+    - [2.1 COS environment variables](#21-cos-environment-variables)
+      - [2.1.1 Getting the **COS_ENDPOINT** variable value](#211-getting-the-cos_endpoint-variable-value)
+    - [2.2 Enabling CORS requests to our bucket](#22-enabling-cors-requests-to-our-bucket)
+      - [2.2.1 Configuring the COS connection object](#221-configuring-the-cos-connection-object)
+      - [2.2.2 Creating the script](#222-creating-the-script)
+  - [3. Express API setup](#3-express-api-setup)
+    - [3.1 getPresignedUrl function](#31-getpresignedurl-function)
+    - [3.2 Routes](#32-routes)
+      - [3.2.1 /upload](#321-upload)
+      - [3.2.2 **/download**](#322-download)
+- [References](#references)
+        
 
 ## 1. COS instance creation
 
@@ -169,11 +185,11 @@ Your `package.json` file should look something like this:
 }
 ```
 
-### 2.1 Enabling CORS requests to our bucket
+### 2.2 Enabling CORS requests to our bucket
 
 In order to use the presigned URL feature, first we need to enable CORS requests to our bucket. To do this we will write a simple script that will send a CORS configuration object to our bucket using the `ibm-cos-sdk`.
 
-#### 2.1.1 Configuring the COS connection object
+#### 2.2.1 Configuring the COS connection object
 
 - Open the `cos.js` file and import `S3` and `Credentials` classes from the `ibm-cos-sdk` and the `dotenv` module.
 - Instantiate and export an object called `cos` that receveis an instance of the `S3` class, passing a config object to the constructor like below.
@@ -200,7 +216,7 @@ export const cos = new S3({
 });
 ```
 
-#### 2.1.2 Creating the script
+#### 2.2.2 Creating the script
 
 - Create a file called `bucketCorsConfig.js` under the `server` folder.
 - Import the `cos` object from the `cos.js` module.
@@ -283,60 +299,150 @@ Security - [https://expressjs.com/en/advanced/best-practice-security.html](https
 
 Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-performance.html](https://expressjs.com/en/advanced/best-practice-performance.html)
     
-### 3.1 **/download** route
+### 3.1 getPresignedUrl function
 
-Now let's create our route to get an URL to download files. In the `routes.js` file:
-- Import the `Router` class from `expresss` and the `cos.js` file. 
-- Instatiate an object `router`, and call the `.use` method from it to create a `/download` route with an `async` handler function with the `req`, `res`, `next` parameters. 
-- From the `req` object get the `params` `bucket` and `fileName`.
-- Inside the handler function, create a `try/catch` block.
-- In the `try` block call the function `getPresignedDownloadUrl` from the `cos` module, passing the `bucket` and `fileName` to it, we are going to implement it right next to this section.
-- In the `catch` block just send the error to the `next` middleware.
-- Lastly, at the end of the file export a variable called `presignedRoutes` that receives the `router` object.
+First we are going to create the function responsible to fetch the URLs from COS. 
+- In the `cos.js` file create and export an async function called `getPresignedUrl` that receives `bucket`, `fileName`, and `operation` as parameters. Check the implementation below:
 
 ```javascript
-import { Router } from 'express';
-import { getPresignedDownloadUrl } from './cos';
+// cos.js
 
-const router = Router();
+import { S3, Credentials } from 'ibm-cos-sdk';
+import dotenv from 'dotenv';
 
-router.use('/download', async (req, res, next) => {
-    const { bucket, fileName } = req.params;
+dotenv.config();
 
-    try {
-        const url = await getPresignedDownloadUrl(bucket, fileName);
-
-        return res.status(200).json({ url });
-    } catch(e) {
-        next(e);
-    }    
+export const cos = new S3({
+    endpoint: process.env.COS_ENDPOINT,
+    apiKeyId: process.env.COS_APIKEYID,
+    ibmAuthEndpoint: process.env.COS_IBM_AUTH_ENDPOINT,
+    serviceInstanceId: process.env.COS_RESOURCE_INSTANCE_ID,
+    credentials: new Credentials(
+        process.env.COS_HMAC_ACCESS_KEY_ID, 
+        process.env.COS_HMAC_SECRET_ACCESS_KEY,
+        null
+    ),
+    signatureVersion: 'v4'
 });
 
-export const presignedRoutes = router;
-```
-
-In the `cos.js` file, let's create and export an async function called `getPresignedDownloadUrl` function: 
-
-```javascript
-export async function getPresignedDownloadUrl(bucket, fileName) {
-    const url = await cos.getSignedUrl('getObject', {
+export async function getPresignedUrl(bucket, fileName, operation) {
+    const url = await cos.getSignedUrl(operation, {
         Bucket: bucket,
         Key: fileName,
-        Expires: URL_EXPIRATION_TIME,
     });
 
     return url;
 }
 ```
 
-We are using the `getSignedUrl` method from the `ibm-cos-sdk`, the first parameter we determine the type of operation that the generated URL will be able to do, in this case we are using `getObject`, a `GET` operation to download an object. The second parameter is an options object with:
-
-    - Bucket: [the bucket name]
-    - Key: [the file name]
+From the `cos` object, we are calling the `getSignedUrl` method from the `ibm-cos-sdk`, passing the operation we want the URL to be able to do and an options object with the bucket and file names. To upload a file we are going to pass `putObject` as the operation, if we want to download a file we are going to pass `getObject`.
 
 You can also pass an `Expires` option to determine how long the URL will live, if no value is passed it defaults to 900 seconds(15 minutes). Read more about the `getSignedUrl` method: [https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property](https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property)
 
-### 3.2 **/upload** route
+### 3.2 Routes
+
+We are going to create two routes: `/api/presigned/upload` and `/api/presigned/download`. Both will use pretty much the same code, the only difference is the operation value. So we will have two middlewares to set those values but just a single `controller` function.
+
+#### 3.2.1 /upload
+
+```javascript
+// routes.js
+import { Router } from 'express';
+import { getPresignedUrl } from './cos';
+
+const router = Router();
+
+router.use('/upload', async (req, res, next) => {  
+    res.locals.operation = 'putObject';
+    
+    next();
+}, controller);
+
+async function controller(req, res, next) {
+    const { bucket, fileName } = req.query;
+    const { operation } = res.locals;
+
+    try {
+        const url = await getPresignedUrl(bucket, fileName, operation);
+
+        return res.status(200).json({ url });
+    } catch(e) {
+        next(e);
+    }
+}
+
+export const presignedRoutes = router;
+```
+
+We import the `Router` class from `expresss` and the function `getPresignedUrl` from the `cos.js` file. First we are call the `.use` method from the `router` object to create the `/upload` route. The first middleware is an `async` function that we are using just to set the operation value to be used in the next middlware, which is the `controller` function that is also going to be used by the `/download` route. 
+
+In the `controller` function we get the `bucket` and `fileName` from the `req.query` parameters and the `operation` value from the `res.locals` object. Then we wrap the `getPresignedUrl` function in a `try/catch` block, if an error is caught we send it to the next middlware otherwise we return the `url` in a JSON format with a status 200. 
+
+Lastly, at the end of the file export a variable called `presignedRoutes` that receives the `router` object, we need to use it in the express server later.
+
+In the `cos.js` file, let's create and export an async function called `getPresignedDownloadUrl` function: 
+
+#### 3.2.2 **/download**
+
+Under the `/upload` route create the `/download` route, your `routes.js` file should look like this:
+
+```javascript
+// routes.js
+
+import { Router } from 'express';
+import { getPresignedUrl } from './cos';
+
+const router = Router();
+
+router.use('/upload', async (req, res, next) => {
+    res.locals.operation = 'putObject';
+    
+    next();
+}, controller);
+
+router.use('/download', async (req, res, next) => {  
+    res.locals.operation = 'getObject';
+    
+    next();
+}, controller);
+
+async function controller(req, res, next) {
+    const { bucket, fileName } = req.query;
+    const { operation } = res.locals;
+
+    try {
+        const url = await getPresignedUrl(bucket, fileName, operation);
+
+        return res.status(200).json({ url });
+    } catch(e) {
+        next(e);
+    }
+}
+
+export const presignedRoutes = router;
+```
+
+To finish up, in the `main.js` file import the `presignedRoutes` from `routes.js` and use it as a middleware like below:
+
+```javascript
+// main.js
+import express from 'express';
+import { presignedRoutes } from './routes';
+
+const PORT = 3030;
+
+const app = express();
+
+app.use('/health', (req, res) => res.json('API is up and running!'));
+
+app.use('/api/presigned', presignedRoutes);
+
+app.listen(PORT, () => {
+    console.log(`API listening on port ${PORT}`);
+});
+
+```
+That's it for the API, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/).
 
 # References
 
