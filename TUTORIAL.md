@@ -1,4 +1,4 @@
-# File upload to IBM Cloud Object Storage directly from the browser. Great upload performance.
+# File upload to IBM Cloud Object Storage directly from the browser, great upload performance. (Node.js back-end + React front-end)
 
 Usually, applications that do file upload will send it through a server before uploading it to a storage service. 
 The problem with this approach is that may you end up with a bottleneck that causes a performance issue when you have multiple clients uploading large files at the same time. 
@@ -12,7 +12,7 @@ The following image shows a simple architecture drawing, the one in the left is 
 In this tutorial you will: 
 - Setup a COS instance to store your files. 
 - Build a [**Node.js API**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-node) to retrieve presigned URLs from the COS instance using your credentials.
-- Build a simple front-end Javascript app to consume the API and upload files to COS using the presigned URLs.
+- Build a simple React front-end app to consume the API and upload files to COS using the presigned URLs.
 
 # Prerequisites
 
@@ -42,6 +42,7 @@ TBD
   - [3.2 Routes](#32-routes)
     - [3.2.1 /upload](#321-upload)
     - [3.2.2 /download](#322-download)
+- [4. Front-end React application](#4-front-end-react-application)
 - [References](#references)
         
 
@@ -298,7 +299,8 @@ Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-p
 ### 3.1 getPresignedUrl function
 
 First we are going to create the function responsible to fetch the URLs from COS. 
-- In the `cos.js` file create and export an async function called `getPresignedUrl` that receives `bucket`, `fileName`, and `operation` as parameters. Check the implementation below:
+
+In the `cos.js` file create and export an async function called `getPresignedUrl` that receives `bucket`, `fileName`, and `operation` as parameters. Check the implementation below:
 
 ```javascript
 // cos.js
@@ -337,7 +339,15 @@ You can also pass an `Expires` option to determine how long the URL will live, i
 
 ### 3.2 Routes
 
-We are going to create two routes: `/api/presigned/upload` and `/api/presigned/download`. Both will use pretty much the same code, the only difference is the operation value. So we will have two middlewares to set those values but just a single `controller` function.
+These are the routes we are going to create:
+
+```
+/api/presigned/download - to get the URL to download files
+/api/presigned/upload - to get the URL to upload files
+/api/buckets/{name}/objects - to get a list of all the files in the bucket
+```
+
+First we are going to create the two routes to get presigned URLs: `/api/presigned/upload` and `/api/presigned/download`. Both will use pretty much the same code, the only difference is the operation value. So we will have two middlewares to set those values but just a single `controller` function. 
 
 #### 3.2.1 /upload
 
@@ -440,9 +450,9 @@ app.listen(PORT, () => {
 
 That's it for the API, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/).
 
-## Front-end application
+## 4. Front-end React application
 
-In the front-end we will have two sections, one being a form to select a file from your file system and the other a list of the files in the bucket. We will use the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) to make all the HTTP requests.
+In the front-end we will have two sections, the first being a form to select a file from your file system, the second section is a list of the files in the bucket. We will use the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) to make all the HTTP requests.
 
 Nowadays, a common approach to architecture is to separate the front-end from the back-end, but for the purpose of this tutorial we are going to make our node app serve an `index.html` file. In a bigger context it would make sense to have this API living by itself as a microservice just to generate the COS URLs.
 
