@@ -38,10 +38,12 @@ TBD
     - [2.2.1 Configuring the COS connection object](#221-configuring-the-cos-connection-object)
     - [2.2.2 Creating the script](#222-creating-the-script)
 - [3. Express API setup](#3-express-api-setup)
-  - [3.1 getPresignedUrl function](#31-getpresignedurl-function)
+  - [3.1 COS functions](#31-cos-functions)
+    - [3.1.1 listFilesFromBucket function](#311-listfilesfrombucket-function)
+    - [3.1.2 getPresignedUrl function](#312-getpresignedurl-function)
   - [3.2 Routes](#32-routes)
-    - [3.2.1 /upload](#321-upload)
-    - [3.2.2 /download](#322-download)
+    - [3.2.1 List files route](#321-list-files-route)
+    - [3.2.2 Download and Upload routes](#322-download-and-upload-routes)
 - [4. Front-end React application](#4-front-end-react-application)
 - [References](#references)
         
@@ -451,9 +453,15 @@ That's it for the API, you can test it using something like [Postman](https://ww
 
 ## 4. Front-end React application
 
-In the front-end we will have two sections, the first being a form to select a file from your file system, the second section is a list of the files in the bucket. We will use the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) to make all the HTTP requests.
+Our front-end will will be composed of two modules, the first being a form to select a file from your file system, the second module is a list of the files in the bucket. We will use the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) to make all the HTTP requests.
 
-Nowadays, a common approach to architecture is to separate the front-end from the back-end, but for the purpose of this tutorial we are going to make our node app serve an `index.html` file. In a bigger context it would make sense to have this API living by itself as a microservice just to generate the COS URLs.
+First we are going to create a React application using `create-react-app`. In your terminal, outside the `server` folder, type the following:
+
+```
+$ npx create-react-app web
+```
+
+It created a folder called `web` with 
 
 To do:
 - create react app
