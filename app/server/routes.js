@@ -1,26 +1,38 @@
 import { Router } from 'express';
-import { getPresignedUrl } from './cos';
+import { getPresignedUrl, listFilesFromBucket } from './cos';
 
 const router = Router();
 
-router.use('/upload', async (req, res, next) => {
+router.get('/:bucketName/files', async (req, res, next) => {
+    const { bucketName } = req.params;
+
+    try {
+        const fileList = await listFilesFromBucket(bucketName);
+
+        res.status(200).json({ files: fileList });
+    } catch (e) {
+        next(e);
+    }
+}); 
+
+router.get('/:bucketName/files/:key/presigned/upload', (req, res, next) => {
     res.locals.operation = 'putObject';
     
     next();
-}, controller);
+}, presignedController);
 
-router.use('/download', async (req, res, next) => {  
+router.get('/:bucketName/files/:key/presigned/download', (req, res, next) => {  
     res.locals.operation = 'getObject';
     
     next();
-}, controller);
+}, presignedController);
 
-async function controller(req, res, next) {
-    const { bucket, fileName } = req.query;
+async function presignedController(req, res, next) {
+    const { bucketName, key } = req.params;
     const { operation } = res.locals;
 
     try {
-        const url = await getPresignedUrl(bucket, fileName, operation);
+        const url = await getPresignedUrl(bucketName, key, operation);
 
         return res.status(200).json({ url });
     } catch(e) {
@@ -28,4 +40,4 @@ async function controller(req, res, next) {
     }
 }
 
-export const presignedRoutes = router;
+export const bucketRoutes = router;

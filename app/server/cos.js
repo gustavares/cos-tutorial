@@ -16,6 +16,18 @@ export const cos = new S3({
     signatureVersion: 'v4'
 });
 
+export async function listFilesFromBucket(bucketName) {
+    const result = await cos.listObjects({
+        Bucket: bucketName
+    }).promise();
+
+    if (result === null || result.Contents === null) {
+        return [];
+    }
+
+    return result.Contents.map(object => object.Key);
+}
+
 export async function getPresignedUrl(bucket, fileName, operation) {
     const url = await cos.getSignedUrl(operation, {
         Bucket: bucket,

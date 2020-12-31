@@ -296,15 +296,12 @@ Security - [https://expressjs.com/en/advanced/best-practice-security.html](https
 
 Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-performance.html](https://expressjs.com/en/advanced/best-practice-performance.html)
     
-### 3.1 getPresignedUrl function
+### 3.1 COS functions
 
-First we are going to create the function responsible to fetch the URLs from COS. 
-
-In the `cos.js` file create and export an async function called `getPresignedUrl` that receives `bucket`, `fileName`, and `operation` as parameters. Check the implementation below:
+We will add two functions to the `cos.js` file: `getPresignedUrl` and `listFilesFromBucket`. Check the implementation below:
 
 ```javascript
 // cos.js
-
 import { S3, Credentials } from 'ibm-cos-sdk';
 import dotenv from 'dotenv';
 
@@ -323,6 +320,18 @@ export const cos = new S3({
     signatureVersion: 'v4'
 });
 
+export async function listFilesFromBucket(bucketName) {
+    const result = await cos.listObjects({
+        Bucket: bucketName
+    }).promise();
+
+    if (result === null || result.Contents === null) {
+        return [];
+    }
+
+    return result.Contents.map(object => object.Key);
+}
+
 export async function getPresignedUrl(bucket, fileName, operation) {
     const url = await cos.getSignedUrl(operation, {
         Bucket: bucket,
@@ -333,6 +342,13 @@ export async function getPresignedUrl(bucket, fileName, operation) {
 }
 ```
 
+We don't check for errors because we leave this resposability for the caller, which is wrapped in a `try/catch` block like we will see in the next [section](#32-routes).
+
+#### 3.1.1 listFilesFromBucket function 
+
+From the `cos` object, we are calling the `listObjects` method from the `ibm-cos-sdk`, passing an options object with the bucket name. Then we check if the `results` object or its `Contents` property are `null`, if so we return an empty array. If there is content to be return we map the `Contents` object to get its `Key` property, which is the file name.
+
+#### 3.1.2 getPresignedUrl function
 From the `cos` object, we are calling the `getSignedUrl` method from the `ibm-cos-sdk`, passing the operation we want the URL to be able to do and an options object with the bucket and file names. To upload a file we are going to pass `putObject` as the operation, if we want to download a file we are going to pass `getObject`.
 
 You can also pass an `Expires` option to determine how long the URL will live, if no value is passed it defaults to 900 seconds(15 minutes). Read more about the `getSignedUrl` method: [https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property](https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property)
@@ -342,77 +358,44 @@ You can also pass an `Expires` option to determine how long the URL will live, i
 These are the routes we are going to create:
 
 ```
-/api/presigned/download - to get the URL to download files
-/api/presigned/upload - to get the URL to upload files
-/api/buckets/{name}/objects - to get a list of all the files in the bucket
+GET /api/buckets/:bucketName/files/:key/presigned/download - to get the URL to download files
+GET /api/buckets/:bucketName/files/:key/presigned/upload - to get the URL to upload files
+GET /api/buckets/:bucketName/files - to get a list of all the files in the bucket
 ```
 
-First we are going to create the two routes to get presigned URLs: `/api/presigned/upload` and `/api/presigned/download`. Both will use pretty much the same code, the only difference is the operation value. So we will have two middlewares to set those values but just a single `controller` function. 
-
-#### 3.2.1 /upload
+This is how the `cos.js` will look like:
 
 ```javascript
 // routes.js
 import { Router } from 'express';
-import { getPresignedUrl } from './cos';
+import { getPresignedUrl, listFilesFromBucket } from './cos';
 
 const router = Router();
 
-router.use('/upload', async (req, res, next) => {  
-    res.locals.operation = 'putObject';
+router.get('/:bucketName/files', async (req, res, next) => {
     
-    next();
-}, controller);
-
-async function controller(req, res, next) {
-    const { bucket, fileName } = req.query;
-    const { operation } = res.locals;
-
     try {
-        const url = await getPresignedUrl(bucket, fileName, operation);
+        const fileList = await listFilesFromBucket();
 
-        return res.status(200).json({ url });
-    } catch(e) {
+        res.status(200).json({ files: fileList });
+    } catch (e) {
         next(e);
     }
-}
+}); 
 
-export const presignedRoutes = router;
-```
-
-We import the `Router` class from `expresss` and the function `getPresignedUrl` from the `cos.js` file. First we are call the `.use` method from the `router` object to create the `/upload` route. The first middleware is an `async` function that we are using just to set the operation value to be used in the next middlware, which is the `controller` function that is also going to be used by the `/download` route. 
-
-In the `controller` function we get the `bucket` and `fileName` from the `req.query` parameters and the `operation` value from the `res.locals` object. Then we wrap the `getPresignedUrl` function in a `try/catch` block, if an error is caught we send it to the next middlware otherwise we return the `url` in a JSON format with a status 200. 
-
-Lastly, at the end of the file export a variable called `presignedRoutes` that receives the `router` object, we need to use it in the express server later.
-
-In the `cos.js` file, let's create and export an async function called `getPresignedDownloadUrl` function: 
-
-#### 3.2.2 /download
-
-Under the `/upload` route create the `/download` route, your `routes.js` file should look like this:
-
-```javascript
-// routes.js
-
-import { Router } from 'express';
-import { getPresignedUrl } from './cos';
-
-const router = Router();
-
-router.use('/upload', async (req, res, next) => {
+router.get('/:bucketName/files/:key/presigned/upload', (req, res, next) => {
     res.locals.operation = 'putObject';
     
     next();
-}, controller);
+}, presignedController);
 
-router.use('/download', async (req, res, next) => {  
+router.get('/:bucketName/files/:key/presigned/download', (req, res, next) => {  
     res.locals.operation = 'getObject';
     
     next();
-}, controller);
+}, presignedController);
 
-async function controller(req, res, next) {
+async function presignedController(req, res, next) {
     const { bucket, fileName } = req.query;
     const { operation } = res.locals;
 
@@ -428,12 +411,28 @@ async function controller(req, res, next) {
 export const presignedRoutes = router;
 ```
 
-To finish up, in the `main.js` file import the `presignedRoutes` from `routes.js` and use it as a middleware like below:
+We import the `Router` class from `expresss` and the functions `getPresignedUrl` and `listFilesFromBucket` from the `cos.js` file. From the `Router` constructor we instantiate an object `router`.
+
+#### 3.2.1 List files route
+
+It is a simple `GET` route that receives the `bucketName` as an URL parameter that we pass in to the `listFilesFromBucket` from the `cos` module. We wrap the call in a `try/catch` block to handle any errors. If no errors occured we return the response object with a status 200 and the list of files in a JSON format.
+
+#### 3.2.2 Download and Upload routes
+
+Both will use pretty much the same code, the only difference is the operation value. So each one will have its own middleware to set those values but just a single `presignedController` function. We use the `res.locals` object property to this.
+
+In the controller function we get the `bucket` and `fileName` from the `req.params` object and the `operation` value from the `res.locals` object that was set in the previous middleware. Then we wrap the `getPresignedUrl` function in a `try/catch` block, if an error is caught we send it to the next middlware otherwise we return the `url` in a JSON format with a status 200. 
+
+Lastly, at the end of the file export a variable called `bucketRoutes` that receives the `router` object, we need to use it in the express server later.
+
+Under the `/upload` route create the `/download` route, your `routes.js` file should look like this:
+
+To finish up, in the `main.js` file import the `bucketRoutes` from `routes.js` and use it as a middleware like below:
 
 ```javascript
 // main.js
 import express from 'express';
-import { presignedRoutes } from './routes';
+import { bucketRoutes } from './routes';
 
 const PORT = 3030;
 
@@ -441,7 +440,7 @@ const app = express();
 
 app.use('/health', (req, res) => res.json('API is up and running!'));
 
-app.use('/api/presigned', presignedRoutes);
+app.use('/api/buckets', bucketRoutes);
 
 app.listen(PORT, () => {
     console.log(`API listening on port ${PORT}`);
@@ -457,12 +456,12 @@ In the front-end we will have two sections, the first being a form to select a f
 Nowadays, a common approach to architecture is to separate the front-end from the back-end, but for the purpose of this tutorial we are going to make our node app serve an `index.html` file. In a bigger context it would make sense to have this API living by itself as a microservice just to generate the COS URLs.
 
 To do:
-- serve index.html
+- create react app
 - api requests to generate urls
 - requests using the urls
 - request to fetch file list
-- html form to upload file
-- html file list
+- form to upload file
+- file list
 
 # References
 
