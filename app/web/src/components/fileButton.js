@@ -19,6 +19,7 @@ const File = ({ filename }) => {
         const url = await fetchDownloadUrl();
         const a = document.createElement('a');
 
+        a.target = '_blank';
         a.href = url;
         a.download = filename;
         document.body.appendChild(a);
@@ -28,7 +29,7 @@ const File = ({ filename }) => {
     return (
         <>
             {filename !== undefined ? (
-                <li style={{ listStyleType: "none" }} >
+                <li style={{ listStyleType: "none", margin: "10px" }} >
                     <button onClick={downloadFile}>
                         {filename}
                     </button>
