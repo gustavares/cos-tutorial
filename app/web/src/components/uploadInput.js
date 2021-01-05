@@ -52,11 +52,13 @@ function UploadInput({fileList, setFileList }) {
         } catch (e) {
             console.log(e);
         }
+
+        document.getElementById('fileInput').value = '';
     }
 
     return (
         <div>
-            <input type="file" onChange={handleInputChange}/>
+            <input id="fileInput" type="file" onChange={handleInputChange}/>
 
             <button onClick={uploadFile}>Upload file</button>
 
