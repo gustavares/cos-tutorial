@@ -458,6 +458,10 @@ Our API is ready to be used, you can test it using something like [Postman](http
 
 Our front-end will will be composed of two modules, the first being a form to select a file from your file system, the second module is a list of the files in the bucket. 
 
+This is how it looks, there is no styled components since the focus here is to learn about the presigned URL feature and how to integrate with a front-end app: 
+
+![front-end-app](images/10-front-end.png)
+
 First we are going to create a React application using `create-react-app`. In your terminal, outside the `server` folder, type the following:
 
 ```
@@ -593,6 +597,7 @@ export default FileList;
 This is a simple component that will hold the list of files, it does not have any logic, just receives the list of files as a `prop` and loops through it to render.
 
 ### 4.4 uploadInput.js
+
 ```javascript
 // uploadInput.js
 import { api, BUCKET_NAME } from '../api';
@@ -673,11 +678,12 @@ function UploadInput({fileList, setFileList }) {
 export default UploadInput;
 ```
 
-This component has three parts, the first is an `input` field to attach the file. Then there is a `button` that, if there is a file attached in the `input`, when clicked starts the upload logic. First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress which is rendered by the last part of the component, a `span` element.
+This component has three parts, the first is an `input` field to attach the file, then there is a `button` that, if there is a file attached in the `input`, when clicked starts the upload logic. First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress which is rendered by the last part of the component, a `span` element.
 
 ### 4.5 App.js
 
 ```javascript
+// App.js
 import { useEffect, useState } from 'react';
 import FileList from './components/fileList';
 import UploadInput from './components/uploadInput';
