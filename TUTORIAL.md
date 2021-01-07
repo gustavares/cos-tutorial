@@ -730,6 +730,14 @@ export default App;
 
 This is the main component of our application, it wraps everything and keeps the state of the `fileList` that is shared by the `FileList` and `UploadInput` components. It also uses the `useEffect` hook to fetch the files from our API when the application is first opened.
 
+To run the front-end app, from the `web` folder run:
+
+```
+$ npm start
+```
+
+With both the API and the React app running you can test everything together. From here you can further customize the API, I suggest you to explore the documentation listed in the [references](#references) to learn how to use other methods from the `ibm-cos-sdk`.
+
 # References
 
 Creating a presigned URL - [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url)
