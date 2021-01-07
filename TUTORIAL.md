@@ -44,7 +44,14 @@ TBD
   - [3.2 Routes](#32-routes)
     - [3.2.1 List files route](#321-list-files-route)
     - [3.2.2 Download and Upload routes](#322-download-and-upload-routes)
+  - [3.3 Testing the API](#33-testing-the-api)
 - [4. Front-end React application](#4-front-end-react-application)
+  - [4.1 .env file](#41-env-file)
+  - [4.2 api.js](#42-apijs)
+  - [4.3 fileButton.js](#43-filebuttonjs)
+  - [4.4 fileList.js](#44-filelistjs)
+  - [4.4 uploadInput.js](#44-uploadinputjs)
+  - [4.5 App.js](#45-appjs)
 - [References](#references)
         
 
@@ -505,7 +512,7 @@ The `.env` file will have just one environment variable:
 REACT_APP_API_URL=http://localhost:3030/api
 ```
 
-### 4.2 api.js file
+### 4.2 api.js
 
 ```javascript
 // api.js
