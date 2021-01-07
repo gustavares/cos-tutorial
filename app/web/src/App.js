@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import FileList from './components/fileList';
-import UploadForm from './components/uploadInput';
+import UploadInput from './components/uploadInput';
 import { api, BUCKET_NAME } from './api';
 import './App.css';
 
@@ -33,7 +33,7 @@ function App() {
 
   return (
     <div className="App">
-      <UploadForm fileList={fileList} setFileList={setFileList}/>
+      <UploadInput fileList={fileList} setFileList={setFileList}/>
 
       <h3>Files from {BUCKET_NAME} bucket</h3>
       {loading ? (
