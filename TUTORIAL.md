@@ -274,6 +274,7 @@ import express from 'express';
 const PORT = 3030;
 
 const app = express();
+app.use(cors());
 
 app.use('/health', (req, res) => res.json('API is up and running!'));
 
@@ -449,11 +450,13 @@ app.listen(PORT, () => {
 });
 ```
 
-That's it for the API, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/).
+### 3.3 Testing the API
+
+Our API is ready to be used, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/). For the examples below I have used Insomnia.
 
 ## 4. Front-end React application
 
-Our front-end will will be composed of two modules, the first being a form to select a file from your file system, the second module is a list of the files in the bucket. We will use the [Fetch API](https://developer.mozilla.org/en-US/docs/Web/API/Fetch_API) to make all the HTTP requests.
+Our front-end will will be composed of two modules, the first being a form to select a file from your file system, the second module is a list of the files in the bucket. 
 
 First we are going to create a React application using `create-react-app`. In your terminal, outside the `server` folder, type the following:
 
@@ -461,15 +464,271 @@ First we are going to create a React application using `create-react-app`. In yo
 $ npx create-react-app web
 ```
 
-It created a folder called `web` with 
+It created a folder called `web` with default files to run a React app. 
 
-To do:
-- create react app
-- api requests to generate urls
-- requests using the urls
-- request to fetch file list
-- form to upload file
-- file list
+Now create the following file structure from it:
+
+```
+web
+|
+└── public    // holds the static assets
+└── src       // has the the React app code
+|   └── components 
+|   |   └── fileButton.js
+|   |   └── fileList.js
+|   |   └── uploadInput.js
+|   └── api.js
+|   └── App.css
+|   └── App.js
+|   └── App.test.js
+|   └── index.css
+|   └── index.js
+|   └── logo.svg
+|   └── reportWebVitals.js
+|   └── setupTests.js
+└── .env
+└── package.json
+└── package-lock.json
+```
+
+Inside the `src` folder create a file called `api.js` and a folder `components` with the files `fileButton.js`, `fileList.js`, `uploadInput.js`. In the root folder create the `.env` file.
+
+### 4.1 .env file
+
+The `.env` file will have just one environment variable:
+
+```
+REACT_APP_API_URL=http://localhost:3030/api
+```
+
+### 4.2 api.js file
+
+```javascript
+// api.js
+import axios from 'axios';
+
+export const api = axios.create({
+    baseURL: process.env.REACT_APP_API_URL
+});
+
+export const BUCKET_NAME = 'cos-tutorial-presigned';
+```
+
+This file just exports an `axios` instance to be used for API calls and the constant `BUCKET_NAME` that holds our COS bucket name.
+
+### 4.3 fileButton.js
+
+```javascript
+// fileButton.js
+import { api, BUCKET_NAME } from "../api";
+
+const File = ({ filename }) => {
+    async function fetchDownloadUrl() {
+        try {
+            const response = await api.get(`/buckets/${BUCKET_NAME}/files/${filename}/presigned/download`);
+
+            if (response.status >= 400) {
+                throw response.data;
+            }
+
+            return response.data.url;
+        } catch(e) {
+            console.log(e);
+        }
+    }
+
+    async function downloadFile() {
+        const url = await fetchDownloadUrl();
+        const a = document.createElement('a');
+
+        a.target = '_blank';
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+    }
+
+    return (
+        <>
+            {filename !== undefined ? (
+                <li style={{ listStyleType: "none", margin: "10px" }} >
+                    <button onClick={downloadFile}>
+                        {filename}
+                    </button>
+                </li>
+            ) : (
+                <></>
+            )}
+        </>
+    )
+}
+
+export default File;
+```
+
+This component represents a file that have already been uploaded. When you click the button it will first make a request to our API to fetch the download URL, then uses this URL to download the file. It creates an `a` element in memory and we will programmatically click on it to start the download in a new tab.
+
+### 4.4 fileList.js
+
+```javascript
+// fileList.js
+import File from './fileButton';
+
+function FileList({ fileList }) {
+    return (
+        <ul>
+            {fileList.map((filename, index) => {
+                
+                return (
+                    <File key={index} filename={filename}/>
+                )
+            })}
+        </ul>
+    );
+}
+
+export default FileList;
+```
+
+This is a simple component that will hold the list of files, it does not have any logic, just receives the list of files as a `prop` and loops through it to render.
+
+### 4.4 uploadInput.js
+```javascript
+// uploadInput.js
+import { api, BUCKET_NAME } from '../api';
+import { useState } from 'react';
+
+function UploadInput({fileList, setFileList }) {
+    const [ selectedFile, setSelectedFile ] = useState();
+    const [ uploadProgress, setUploadProgress ] = useState();
+
+    async function fetchUploadUrl(filename) {
+        try {
+            const response = await api.get(`/buckets/${BUCKET_NAME}/files/${filename}/presigned/upload`);
+
+            if (response.status >= 400) {
+                throw response.data;
+            }
+
+            return response.data.url;
+        } catch(e) {
+            console.log(e);
+        }
+    }
+    
+    function handleInputChange(event) {
+        const file = event.target.files[0];
+
+        if (file) {
+            setSelectedFile(file);
+        }
+    }
+
+    async function uploadFile() {
+        if (selectedFile === undefined) {
+            alert('Please select a file first.');
+            return;
+        }
+
+        try {
+            const url = await fetchUploadUrl(selectedFile.name);
+            const response = await api.put(url, selectedFile, {
+                onUploadProgress: (progressEvent) => {
+                    setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+                }
+            });
+
+            if (response.status >= 400) {
+                throw response.data;
+            }
+
+            setFileList([...fileList, selectedFile.name]);
+            setUploadProgress(undefined);
+            
+            alert(`${selectedFile.name} uploaded successfully!`);
+        } catch (e) {
+            console.log(e);
+        }
+
+        document.getElementById('fileInput').value = '';
+    }
+
+    return (
+        <div>
+            <input id="fileInput" type="file" onChange={handleInputChange}/>
+
+            <button onClick={uploadFile}>Upload file</button>
+
+            {uploadProgress ? (
+                <span style={{ marginLeft: "30px"}}>
+                    {uploadProgress}%
+                </span>
+            ) : (
+                <></>
+            )}
+        </div>
+    );
+}
+
+export default UploadInput;
+```
+
+This component has three parts, the first is an `input` field to attach the file. Then there is a `button` that, if there is a file attached in the `input`, when clicked starts the upload logic. First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress which is rendered by the last part of the component, a `span` element.
+
+### 4.5 App.js
+
+```javascript
+import { useEffect, useState } from 'react';
+import FileList from './components/fileList';
+import UploadInput from './components/uploadInput';
+import { api, BUCKET_NAME } from './api';
+import './App.css';
+
+function App() {
+  const [ fileList, setFileList ] = useState([]);
+  const [ loading, setLoading ] = useState(true);
+
+  useEffect(() => {
+      (async () => {
+        const files = await fetchFileList();
+
+        setFileList(files);
+        setLoading(loading => !loading);
+      })();
+  }, []);
+
+  async function fetchFileList() {
+    try {
+        const response = await api.get(`/buckets/${BUCKET_NAME}/files`);
+
+        if (response.status >= 400) {
+            throw response.data;
+        }
+
+        return response.data.files;
+    } catch (e) {
+        console.log(e);
+    }
+  }
+
+  return (
+    <div className="App">
+      <UploadInput fileList={fileList} setFileList={setFileList}/>
+
+      <h3>Files from {BUCKET_NAME} bucket</h3>
+      {loading ? (
+        <h4> Loading ... </h4>
+      ) : (
+        <FileList fileList={fileList} />
+      )}
+    </div>
+  );
+}
+
+export default App;
+```
+
+This is the main component of our application, it wraps everything and keeps the state of the `fileList` that is shared by the `FileList` and `UploadInput` components. It also uses the `useEffect` hook to fetch the files from our API when the application is first opened.
 
 # References
 
