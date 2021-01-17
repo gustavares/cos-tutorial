@@ -36,3 +36,55 @@ export async function getPresignedUrl(bucket, fileName, operation) {
 
     return url;
 }
+
+/**
+ * Initiates a multipart upload and returns the UploadId
+ * 
+ * @param {string} bucket 
+ * @param {string} fileName 
+ */
+async function initiateMultipartUpload(bucket, fileName) {
+    const response = await cos.createMultipartUpload({
+        Bucket: bucket,
+        Key: fileName
+    }).promise();
+
+    return response.UploadId;
+}
+
+/**
+ * Initiates a multipart upload.
+ * 
+ * Returns an object with the UploadId and 
+ * a list of objects containing signed URLs and the part number related to it 
+ * to be used to upload file parts.
+ * 
+ * @param {string} bucket 
+ * @param {string} fileName 
+ * @param {number} numberOfParts 
+ */
+export async function getPresignedUploadUrlParts(bucket, fileName, numOfParts) {
+    const numberOfParts = Number(numOfParts);
+    const uploadId = await initiateMultipartUpload(bucket, fileName);
+    
+    const promises = [];
+    [...Array(numberOfParts).keys()].map((partNumber) => {
+        const promise = cos.getSignedUrlPromise('uploadPart', {
+            Bucket: bucket,
+            Key: fileName,
+            UploadId: uploadId,
+            PartNumber: partNumber + 1
+        });
+
+        promises.push(promise);
+    });
+
+    const urls = await Promise.all(promises);
+    
+    const parts = urls.map((url, index) => ({
+        part: index + 1,
+        url: url
+    }));
+
+    return { uploadId, parts }
+}

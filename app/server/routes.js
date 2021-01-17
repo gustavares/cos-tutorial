@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { getPresignedUrl, listFilesFromBucket } from './cos';
+import { getPresignedUrl, listFilesFromBucket, getPresignedUploadUrlParts } from './cos';
 
 const router = Router();
 
@@ -14,6 +14,19 @@ router.get('/:bucketName/files', async (req, res, next) => {
         next(e);
     }
 }); 
+
+router.get('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, key } = req.params;
+    const { parts } = req.query;
+
+    try {
+        const uploadIdAndParts = await getPresignedUploadUrlParts(bucketName, key, parts);
+
+        return res.status(200).json(uploadIdAndParts);
+    } catch (e) {
+        next(e);
+    }
+});
 
 router.get('/:bucketName/files/:key/presigned/upload', (req, res, next) => {
     res.locals.operation = 'putObject';
