@@ -88,3 +88,20 @@ export async function getPresignedUploadUrlParts(bucket, fileName, numOfParts) {
 
     return { uploadId, parts }
 }
+
+export async function completeMultipartUpload(bucket, fileName, uploadId, partsEtags) {
+    await cos.completeMultipartUpload({
+        Bucket: bucket,
+        Key: fileName,
+        UploadId: uploadId,
+        MultipartUpload: { Parts: partsEtags }
+    }).promise();
+}
+
+export async function abortMultipartUpload(bucket, fileName, uploadId) {
+    await cos.abortMultipartUpload({
+        Bucket: bucket, 
+        Key: fileName, 
+        UploadId: uploadId
+    }).promise();
+}

@@ -1,5 +1,11 @@
 import { Router } from 'express';
-import { getPresignedUrl, listFilesFromBucket, getPresignedUploadUrlParts } from './cos';
+import { 
+    getPresignedUrl, 
+    listFilesFromBucket, 
+    getPresignedUploadUrlParts,
+    completeMultipartUpload,
+    abortMultipartUpload 
+} from './cos';
 
 const router = Router();
 
@@ -23,6 +29,32 @@ router.get('/:bucketName/files/:key/presigned/upload/multipart', async (req, res
         const uploadIdAndParts = await getPresignedUploadUrlParts(bucketName, key, parts);
 
         return res.status(200).json(uploadIdAndParts);
+    } catch (e) {
+        next(e);
+    }
+});
+
+router.post('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, key } = req.params;
+    const { uploadId, partsEtags } = req.body;
+
+    try {
+        await completeMultipartUpload(bucketName, key, uploadId, partsEtags);
+
+        return res.status(200).json(`Multipart upload for ${key} completed successfully.`);
+    } catch (e) {
+        next(e);
+    }
+});
+
+router.delete('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, key } = req.params;
+    const { uploadId } = req.query;
+
+    try {
+        await abortMultipartUpload(bucketName, key, uploadId);
+
+        return res.status(200).json(`Multipart upload for ${key} aborted successfully.`);
     } catch (e) {
         next(e);
     }
