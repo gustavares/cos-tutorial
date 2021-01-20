@@ -9,7 +9,8 @@ async function enableCorsRequests(bucketName) {
                     {
                         'AllowedMethods': ['PUT'],
                         'AllowedOrigins': ['*'],
-                        'AllowedHeaders': ['*']
+                        'AllowedHeaders': ['*'],
+                        'ExposeHeaders': ['Etag']
                     }
                 ],
             }
