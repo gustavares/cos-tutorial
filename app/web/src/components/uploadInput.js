@@ -5,7 +5,8 @@ const FILE_CHUNK_SIZE = 1024 * 1024 * 5;
 
 function UploadInput({fileList, setFileList }) {
     const [ selectedFile, setSelectedFile ] = useState();
-    const [ uploadProgress, setUploadProgress ] = useState();
+    const [ progressArray, setProgressArray ] = useState([])
+    const [ uploadProgress, setUploadProgress ] = useState(0);
 
     async function fetchUploadUrl(filename) {
         try {
@@ -52,7 +53,6 @@ function UploadInput({fileList, setFileList }) {
             const newStartPointer = startPointer + FILE_CHUNK_SIZE;
             
             const slice = file.slice(startPointer, newStartPointer);
-            console.log(slice);
             chunks.push(slice);
             
             startPointer = newStartPointer; 
@@ -79,8 +79,18 @@ function UploadInput({fileList, setFileList }) {
         }
     }
     
-    function uploadProgressHandler(progressEvent, total) {
-        setUploadProgress(Math.round((progressEvent.loaded * 100) / total))
+    async function uploadProgressHandler(progressEvent, numberOfParts, index) {
+        if (progressEvent.loaded >= progressEvent.total) return;
+
+        const currentProgress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        setProgressArray((progressArray) => {
+            progressArray[index] = currentProgress;
+            
+            const sum = progressArray.reduce((acc, curr) => acc + curr);
+            setUploadProgress(Math.round(sum / numberOfParts));
+            
+            return progressArray;
+        });
     }
 
     /**
@@ -88,14 +98,19 @@ function UploadInput({fileList, setFileList }) {
      */
     async function multipartUpload(file) {
         const chunks = getFileChunks(file);
+
         const { uploadId, parts } = await fetchUploadIdAndParts(file.name, chunks.length);
 
         const promises = [];
 
         parts.map(({ url, part }) => {
-            promises.push(api.put(url, chunks[part - 1], {
-                onUploadProgress: (e) => uploadProgressHandler(e, file.size)
-            }));
+            const index = part - 1;
+            
+            promises.push(
+                api.put(url, chunks[index], {
+                    onUploadProgress: (e) => uploadProgressHandler(e, chunks.length, index)
+                })
+            );
         });
 
         const response = await Promise.all(promises);
@@ -106,7 +121,23 @@ function UploadInput({fileList, setFileList }) {
                 PartNumber: (index + 1)
             }
         });
+
         completeMultipartUpload(file.name, uploadId, partsETags);
+    }
+
+    async function singlepartUpload(file) {
+        const url = await fetchUploadUrl(file.name);
+        const response = await api.put(url, file, {
+            onUploadProgress: (progressEvent) => {
+                setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+            }
+        });
+
+        if (response.status >= 400) {
+            throw response.data;
+        }
+
+        alert(`${file.name} uploaded successfully!`);
     }
 
     async function onUploadButtonClick() {
@@ -115,30 +146,19 @@ function UploadInput({fileList, setFileList }) {
             return;
         }
 
-        if (selectedFile.size > FILE_CHUNK_SIZE) {
-            await multipartUpload(selectedFile);
+        try {
+            if (selectedFile.size > FILE_CHUNK_SIZE) {
+                await multipartUpload(selectedFile);
+            } else {
+                await singlepartUpload(selectedFile);
+            }
+        } catch (e) {
+            console.log(e);
         }
 
-        // try {
-        //     const url = await fetchUploadUrl(selectedFile.name);
-        //     const response = await api.put(url, selectedFile, {
-        //         onUploadProgress: (progressEvent) => {
-        //             setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
-        //         }
-        //     });
-
-        //     if (response.status >= 400) {
-        //         throw response.data;
-        //     }
-
-            setFileList([...fileList, selectedFile.name]);
-            setUploadProgress(undefined);
-            
-        //     alert(`${selectedFile.name} uploaded successfully!`);
-        // } catch (e) {
-        //     console.log(e);
-        // }
-
+        setFileList([...fileList, selectedFile.name]);
+        setUploadProgress(0);
+        setProgressArray([]);
         document.getElementById('fileInput').value = '';
     }
 
@@ -148,7 +168,7 @@ function UploadInput({fileList, setFileList }) {
 
             <button onClick={onUploadButtonClick}>Upload file</button>
 
-            {uploadProgress ? (
+            {uploadProgress !== 0 ? (
                 <span style={{ marginLeft: "30px"}}>
                     {uploadProgress}%
                 </span>
