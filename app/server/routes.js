@@ -36,10 +36,10 @@ router.get('/:bucketName/files/:key/presigned/upload/multipart', async (req, res
 
 router.post('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
     const { bucketName, key } = req.params;
-    const { uploadId, partsEtags } = req.body;
+    const { uploadId, partsETags } = req.body;
 
     try {
-        await completeMultipartUpload(bucketName, key, uploadId, partsEtags);
+        await completeMultipartUpload(bucketName, key, uploadId, partsETags);
 
         return res.status(200).json(`Multipart upload for ${key} completed successfully.`);
     } catch (e) {
