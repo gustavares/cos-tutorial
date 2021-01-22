@@ -1,18 +1,18 @@
-# File upload to IBM Cloud Object Storage directly from the browser, great upload performance. (Node.js back-end + React front-end)
+# Improving upload performance with multipart file upload directly from the browser to IBM Cloud Object Storage. (Node.js back-end + React front-end)
 
 Usually, applications that do file upload will send it through a server before uploading it to a storage service. 
-The problem with this approach is that may you end up with a bottleneck that causes a performance issue when you have multiple clients uploading large files at the same time. 
-You can boost up the performance if the client side could upload directly to the storage service.
-To achieve this you can use [*IBM Cloud Object Storage*(COS)](https://cloud.ibm.com/docs/cloud-object-storage) service. It uses a subset of the [S3 API](https://cloud.ibm.com/docs/cloud-object-storage/api-reference?topic=cloud-object-storage-compatibility-api), which includes the [**presigned URL**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url) feature. A presigned URL is a temporary link generated from your COS credentials that you can send to clients so they can do operations to specific objects without authentication. The client can use the URL retrieved from the server to upload/download files directly to/from a *bucket* at your COS instance.
+The problem with this approach is that you may end up with a bottleneck that causes a performance issue when you have multiple clients uploading large files at the same time.
+You can boost up the performance if the client side could upload directly to the storage service without sending the file through the server and in addition, if you have to upload a large file, you can also split it up into parts to upload them in parallel.
+To achieve this you can use [*IBM Cloud Object Storage*(COS)](https://cloud.ibm.com/docs/cloud-object-storage) service. It uses a subset of the [S3 API](https://cloud.ibm.com/docs/cloud-object-storage/api-reference?topic=cloud-object-storage-compatibility-api), which includes the [**presigned URL**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url) and [**multipart upload**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects) features. A presigned URL is a temporary link generated from your COS credentials that you can send to clients so they can do operations to specific objects without authentication, because your server has the credentials and used it to sign the URL. The client can use the URL retrieved from the server to upload/download files directly to/from a *bucket* at your COS instance.
 
-The following image shows a simple architecture drawing, the one in the left is what is usually done and the one in the right is what we are going to build:
+The following image shows two simple architecture drawings, the one in the left is what is usually done and the one in the right is what we are going to build:
 
 ![Architecture](images/1-architecture.png)
 
 In this tutorial you will: 
 - Setup a COS instance to store your files. 
 - Build a [**Node.js API**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-node) to retrieve presigned URLs from the COS instance using your credentials.
-- Build a simple React front-end app to consume the API and upload files to COS using the presigned URLs.
+- Build a simple React front-end app to consume the API, split a file into parts if needed, and upload them to COS using the presigned URLs.
 
 # Prerequisites
 
@@ -20,7 +20,7 @@ In this tutorial you will:
 - An [IBM Cloud account](https://cloud.ibm.com/registration).
 - A text editor. I'm using [VSCode](https://code.visualstudio.com/).
 
-You can find the entire code created for the tutorial in this repo [https://github.com/gustavares/cos-tutorial/](https://github.com/gustavares/cos-tutorial/)
+You can find the entire code created for the tutorial in this repo [https://github.com/gustavares/cos-tutorial/](https://github.com/gustavares/cos-tutorial/).
   
 # Estimated time
 
@@ -153,10 +153,11 @@ Now we are going to install the dependencies:
 - [Express](https://expressjs.com/) - to create the API
 - [IBM COS SDK for Node.js](https://www.npmjs.com/package/ibm-cos-sdk) - to easily connect to our COS instance
 - [dotenv](https://www.npmjs.com/package/dotenv) - to read environment variables from `.env` file
+- [cors](https://www.npmjs.com/package/cors) - to enable CORS requests since the front-end is a separate application
 - [Nodemon](https://www.npmjs.com/package/nodemon) - to help in development, automatically restarts the node app when file changes.
   
 ```
-$ npm i -S express ibm-cos-sdk dotenv && npm i -S -D nodemon
+$ npm i -S express ibm-cos-sdk dotenv cors && npm i -S -D nodemon
 ```
 Then add the following line to the `scripts` section of your `package.json` file:
 
@@ -181,6 +182,7 @@ Your `package.json` file should look something like this:
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "cors": "^2.8.5",
     "dotenv": "^8.2.0",
     "esm": "^3.2.25",
     "express": "^4.17.1",
@@ -194,7 +196,7 @@ Your `package.json` file should look something like this:
 
 ### 2.2 Enabling CORS requests to our bucket
 
-In order to use the presigned URL feature, first we need to enable CORS requests to our bucket. To do this we will write a simple script that will send a CORS configuration object to our bucket using the `ibm-cos-sdk`.
+In order to use the presigned URL feature, first we need to enable CORS requests to our bucket and expose the `ETag` header property, because its needed for the multipart upload. To do this we will write a simple script that will send a CORS configuration object to our bucket using the `ibm-cos-sdk`.
 
 #### 2.2.1 Configuring the COS connection object
 
@@ -243,7 +245,8 @@ async function enableCorsRequests(bucketName) {
                     {
                         'AllowedMethods': ['PUT'],
                         'AllowedOrigins': ['*'],
-                        'AllowedHeaders': ['*']
+                        'AllowedHeaders': ['*'],
+                        'ExposeHeaders': ['Etag']
                     }
                 ],
             }
@@ -272,15 +275,17 @@ If everything was alright you will see the following message in the console:
 
 ## 3. Express API setup
 
-Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and setup our server to listen on port `3030`. We are also adding a `/health` route just for health check.
+Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and `cors` and setup our server to listen on port `3030`. We are also adding a `/health` route just for health check.
 
 ```javascript
 // ESM syntax is supported.
 import express from 'express';
+import cors from 'cors';
 
 const PORT = 3030;
 
 const app = express();
+app.use(express.json());
 app.use(cors());
 
 app.use('/health', (req, res) => res.json('API is up and running!'));
@@ -308,7 +313,15 @@ Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-p
     
 ### 3.1 COS functions
 
-We will add two functions to the `cos.js` file: `getPresignedUrl` and `listFilesFromBucket`. Check the implementation below:
+These are the functions responsible to communicate with COS using the `ibm-cos-sdk`. We are going to create the following function in the `cos.js` file: 
+- `getPresignedUrl`
+- `listFilesFromBucket`
+- `initiateMultipartUpload`
+- `getPresignedUploadUrlParts`
+- `completeMultipartUpload`
+- `abortMultipartUpload`
+  
+Check the implementation below:
 
 ```javascript
 // cos.js
@@ -350,9 +363,61 @@ export async function getPresignedUrl(bucket, fileName, operation) {
 
     return url;
 }
+
+async function initiateMultipartUpload(bucket, fileName) {
+    const response = await cos.createMultipartUpload({
+        Bucket: bucket,
+        Key: fileName
+    }).promise();
+
+    return response.UploadId;
+}
+
+export async function getPresignedUploadUrlParts(bucket, fileName, numOfParts) {
+    const numberOfParts = Number(numOfParts);
+    const uploadId = await initiateMultipartUpload(bucket, fileName);
+    
+    const promises = [];
+    [...Array(numberOfParts).keys()].map((partNumber) => {
+        const promise = cos.getSignedUrlPromise('uploadPart', {
+            Bucket: bucket,
+            Key: fileName,
+            UploadId: uploadId,
+            PartNumber: partNumber + 1
+        });
+
+        promises.push(promise);
+    });
+
+    const urls = await Promise.all(promises);
+    
+    const parts = urls.map((url, index) => ({
+        part: index + 1,
+        url: url
+    }));
+
+    return { uploadId, parts }
+}
+
+export async function completeMultipartUpload(bucket, fileName, uploadId, partsEtags) {
+    await cos.completeMultipartUpload({
+        Bucket: bucket,
+        Key: fileName,
+        UploadId: uploadId,
+        MultipartUpload: { Parts: partsEtags }
+    }).promise();
+}
+
+export async function abortMultipartUpload(bucket, fileName, uploadId) {
+    await cos.abortMultipartUpload({
+        Bucket: bucket, 
+        Key: fileName, 
+        UploadId: uploadId
+    }).promise();
+}
 ```
 
-We don't check for errors because we leave this resposability for the caller, which is wrapped in a `try/catch` block like we will see in the next [section](#32-routes).
+We don't check for errors because we leave this resposability for the "controller layer", which wraps these functions calls in a `try/catch` block like we will see in the next [section](#32-routes).
 
 #### 3.1.1 listFilesFromBucket function 
 
@@ -363,14 +428,32 @@ From the `cos` object, we are calling the `getSignedUrl` method from the `ibm-co
 
 You can also pass an `Expires` option to determine how long the URL will live, if no value is passed it defaults to 900 seconds(15 minutes). Read more about the `getSignedUrl` method: [https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property](https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property)
 
+#### 3.1.3 initiateMultipartUpload function
+
+Initiates a multipart upload and returns the UploadId
+
+#### 3.1.4 getPresignedUploadUrlParts function
+
+Initiates a multipart upload.
+Returns an object with the UploadId and a list of objects containing signed URLs and the part number related to it to be used to upload file parts.
+
+#### 3.1.5 completeMultipartUpload function
+
+#### 3.1.6 abortMultipartUpload function
+
+
 ### 3.2 Routes
 
 These are the routes we are going to create:
 
 ```
+GET /api/buckets/:bucketName/files - to get a list of all the files in the bucket
 GET /api/buckets/:bucketName/files/:key/presigned/download - to get the URL to download files
 GET /api/buckets/:bucketName/files/:key/presigned/upload - to get the URL to upload files
-GET /api/buckets/:bucketName/files - to get a list of all the files in the bucket
+
+GET    /api/buckets/:bucketName/files/:key/presigned/upload/multipart - to get one URL for each file part to be uploaded
+POST   /api/buckets/:bucketName/files/:key/presigned/upload/multipart - to complete a multipart upload
+DELETE /api/buckets/:bucketName/files/:key/presigned/upload/multipart - to abort a multipart upload
 ```
 
 This is how the `cos.js` will look like:
@@ -378,20 +461,66 @@ This is how the `cos.js` will look like:
 ```javascript
 // routes.js
 import { Router } from 'express';
-import { getPresignedUrl, listFilesFromBucket } from './cos';
+import { 
+    getPresignedUrl, 
+    listFilesFromBucket, 
+    getPresignedUploadUrlParts,
+    completeMultipartUpload,
+    abortMultipartUpload 
+} from './cos';
 
 const router = Router();
 
 router.get('/:bucketName/files', async (req, res, next) => {
-    
+    const { bucketName } = req.params;
+
     try {
-        const fileList = await listFilesFromBucket();
+        const fileList = await listFilesFromBucket(bucketName);
 
         res.status(200).json({ files: fileList });
     } catch (e) {
         next(e);
     }
 }); 
+
+router.get('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, key } = req.params;
+    const { parts } = req.query;
+
+    try {
+        const uploadIdAndParts = await getPresignedUploadUrlParts(bucketName, key, parts);
+
+        return res.status(200).json(uploadIdAndParts);
+    } catch (e) {
+        next(e);
+    }
+});
+
+router.post('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, key } = req.params;
+    const { uploadId, partsETags } = req.body;
+
+    try {
+        await completeMultipartUpload(bucketName, key, uploadId, partsETags);
+
+        return res.status(200).json(`Multipart upload for ${key} completed successfully.`);
+    } catch (e) {
+        next(e);
+    }
+});
+
+router.delete('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, key } = req.params;
+    const { uploadId } = req.query;
+
+    try {
+        await abortMultipartUpload(bucketName, key, uploadId);
+
+        return res.status(200).json(`Multipart upload for ${key} aborted successfully.`);
+    } catch (e) {
+        next(e);
+    }
+});
 
 router.get('/:bucketName/files/:key/presigned/upload', (req, res, next) => {
     res.locals.operation = 'putObject';
@@ -406,11 +535,11 @@ router.get('/:bucketName/files/:key/presigned/download', (req, res, next) => {
 }, presignedController);
 
 async function presignedController(req, res, next) {
-    const { bucket, fileName } = req.query;
+    const { bucketName, key } = req.params;
     const { operation } = res.locals;
 
     try {
-        const url = await getPresignedUrl(bucket, fileName, operation);
+        const url = await getPresignedUrl(bucketName, key, operation);
 
         return res.status(200).json({ url });
     } catch(e) {
@@ -418,7 +547,7 @@ async function presignedController(req, res, next) {
     }
 }
 
-export const presignedRoutes = router;
+export const bucketRoutes = router;
 ```
 
 We import the `Router` class from `expresss` and the functions `getPresignedUrl` and `listFilesFromBucket` from the `cos.js` file. From the `Router` constructor we instantiate an object `router`.
@@ -435,7 +564,11 @@ In the controller function we get the `bucket` and `fileName` from the `req.para
 
 Lastly, at the end of the file export a variable called `bucketRoutes` that receives the `router` object, we need to use it in the express server later.
 
-Under the `/upload` route create the `/download` route, your `routes.js` file should look like this:
+#### 3.2.3 Get multipart upload url routes
+
+#### 3.2.4 Complete multipart upload route
+
+#### 3.2.5 Abort multipart upload route
 
 To finish up, in the `main.js` file import the `bucketRoutes` from `routes.js` and use it as a middleware like below:
 
@@ -519,7 +652,10 @@ REACT_APP_API_URL=http://localhost:3030/api
 import axios from 'axios';
 
 export const api = axios.create({
-    baseURL: process.env.REACT_APP_API_URL
+    baseURL: process.env.REACT_APP_API_URL,
+    headers: {
+        'Content-Type': 'application/json'
+    }
 });
 
 export const BUCKET_NAME = 'cos-tutorial-presigned';
@@ -610,9 +746,12 @@ This is a simple component that will hold the list of files, it does not have an
 import { api, BUCKET_NAME } from '../api';
 import { useState } from 'react';
 
+const FILE_CHUNK_SIZE = 1024 * 1024 * 5;
+
 function UploadInput({fileList, setFileList }) {
     const [ selectedFile, setSelectedFile ] = useState();
-    const [ uploadProgress, setUploadProgress ] = useState();
+    const [ progressArray, setProgressArray ] = useState([])
+    const [ uploadProgress, setUploadProgress ] = useState(0);
 
     async function fetchUploadUrl(filename) {
         try {
@@ -627,6 +766,20 @@ function UploadInput({fileList, setFileList }) {
             console.log(e);
         }
     }
+
+    async function fetchUploadIdAndParts(filename, numberOfParts) {
+        try {
+            const response = await api.get(`/buckets/${BUCKET_NAME}/files/${filename}/presigned/upload/multipart?parts=${numberOfParts}`);
+
+            if (response.status >= 400) {
+                throw response.data;
+            }
+
+            return response.data;
+        } catch(e) {
+            console.log(e);
+        }
+    }
     
     function handleInputChange(event) {
         const file = event.target.files[0];
@@ -636,32 +789,118 @@ function UploadInput({fileList, setFileList }) {
         }
     }
 
-    async function uploadFile() {
-        if (selectedFile === undefined) {
-            alert('Please select a file first.');
-            return;
+    function getFileChunks(file) {
+        const chunks = [];
+        const finalPointer = file.size;
+        let startPointer = 0;
+
+        while (startPointer < finalPointer) {
+            const newStartPointer = startPointer + FILE_CHUNK_SIZE;
+            
+            const slice = file.slice(startPointer, newStartPointer);
+            chunks.push(slice);
+            
+            startPointer = newStartPointer; 
         }
 
+        return chunks;
+    }
+
+    async function completeMultipartUpload(filename, uploadId, partsETags) {
+
         try {
-            const url = await fetchUploadUrl(selectedFile.name);
-            const response = await api.put(url, selectedFile, {
-                onUploadProgress: (progressEvent) => {
-                    setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
-                }
+            const response = await api.post(`/buckets/${BUCKET_NAME}/files/${filename}/presigned/upload/multipart`, {
+                uploadId,
+                partsETags
             });
 
             if (response.status >= 400) {
                 throw response.data;
             }
 
-            setFileList([...fileList, selectedFile.name]);
-            setUploadProgress(undefined);
+            alert(`Completed multipart upload for ${filename}`);
+        } catch (e) {
+            console.log(e);
+        }
+    }
+    
+    async function uploadProgressHandler(progressEvent, numberOfParts, index) {
+        if (progressEvent.loaded >= progressEvent.total) return;
+
+        const currentProgress = Math.round((progressEvent.loaded * 100) / progressEvent.total);
+        setProgressArray((progressArray) => {
+            progressArray[index] = currentProgress;
             
-            alert(`${selectedFile.name} uploaded successfully!`);
+            const sum = progressArray.reduce((acc, curr) => acc + curr);
+            setUploadProgress(Math.round(sum / numberOfParts));
+            
+            return progressArray;
+        });
+    }
+
+    async function multipartUpload(file) {
+        const chunks = getFileChunks(file);
+
+        const { uploadId, parts } = await fetchUploadIdAndParts(file.name, chunks.length);
+
+        const promises = [];
+
+        parts.map(({ url, part }) => {
+            const index = part - 1;
+            
+            promises.push(
+                api.put(url, chunks[index], {
+                    onUploadProgress: (e) => uploadProgressHandler(e, chunks.length, index)
+                })
+            );
+        });
+
+        const response = await Promise.all(promises);
+
+        const partsETags = response.map((part, index) => {
+            return {
+                ETag: part.headers.etag,
+                PartNumber: (index + 1)
+            }
+        });
+
+        completeMultipartUpload(file.name, uploadId, partsETags);
+    }
+
+    async function singlepartUpload(file) {
+        const url = await fetchUploadUrl(file.name);
+        const response = await api.put(url, file, {
+            onUploadProgress: (progressEvent) => {
+                setUploadProgress(Math.round((progressEvent.loaded * 100) / progressEvent.total));
+            }
+        });
+
+        if (response.status >= 400) {
+            throw response.data;
+        }
+
+        alert(`${file.name} uploaded successfully!`);
+    }
+
+    async function onUploadButtonClick() {
+        if (selectedFile === undefined) {
+            alert('Please, first select a file.');
+            return;
+        }
+
+        try {
+            if (selectedFile.size > FILE_CHUNK_SIZE) {
+                await multipartUpload(selectedFile);
+            } else {
+                await singlepartUpload(selectedFile);
+            }
         } catch (e) {
             console.log(e);
         }
 
+        setFileList([...fileList, selectedFile.name]);
+        setUploadProgress(0);
+        setProgressArray([]);
         document.getElementById('fileInput').value = '';
     }
 
@@ -669,9 +908,9 @@ function UploadInput({fileList, setFileList }) {
         <div>
             <input id="fileInput" type="file" onChange={handleInputChange}/>
 
-            <button onClick={uploadFile}>Upload file</button>
+            <button onClick={onUploadButtonClick}>Upload file</button>
 
-            {uploadProgress ? (
+            {uploadProgress !== 0 ? (
                 <span style={{ marginLeft: "30px"}}>
                     {uploadProgress}%
                 </span>
@@ -685,7 +924,16 @@ function UploadInput({fileList, setFileList }) {
 export default UploadInput;
 ```
 
-This component has three parts, the first is an `input` field to attach the file, then there is a `button` that, if there is a file attached in the `input`, when clicked starts the upload logic. First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress which is rendered by the last part of the component, a `span` element.
+This component has three parts, the first is an `input` field to attach the file, then there is a `button` that, if there is a file attached in the `input`, when clicked starts the upload logic. 
+We have two paths for the upload logic based on the file size, if the file is smaller than the `FILE_CHUNK_SIZE`, which is set to 5Mb, then we use the `singlepartUpload` function, else if the file size is bigger than 5Mb we call the `multipartUpload` function.
+
+#### 4.4.1 Singlepart upload
+
+First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress which is rendered by the last part of the component, a `span` element.
+
+#### 4.4.1 Multipart upload
+
+@todo
 
 ### 4.5 App.js
 
