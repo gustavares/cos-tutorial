@@ -579,7 +579,7 @@ In the controller function we get the `bucket` and `fileName` from the `req.para
 ```
 GET /api/buckets/:bucketName/files/:key/presigned/upload/multipart
 ```
-Differently from the other upload route, the client will decide to call this one depending on the file size. The minimum file size to do a multipart upload is 5MB.
+Differently from the other upload route, the client will decide to call this one depending on the file size. You can only do multipart uploads if the file is larger than 5MB.
 It receives the `bucketName` and `fileName`, as route parameters and the number of `parts` as a query parameter. Responds with a status `200` and an object with the upload id and an array of objects with the signed URLs paired with an index.
 
 #### 3.2.4 **Complete multipart upload route**
@@ -622,7 +622,9 @@ That's it for the API, it is ready to be used, you can test it using something l
 ---
 ## 4. **Front-end React application**
 
-Our front-end will be composed of two modules, the first has an `<input>` to select a file from your file system and a `<button>` to upload it, the second module is a list of the files in the bucket. 
+Our front-end will be composed of two modules:
+- the first has an `<input>` to select a file from your file system and a `<button>` to upload it. There is also a hidden `<span>` that will display the upload progress.
+- the second module has the bucket name on top and a `<ul>` list with one `<li>` with a `<button>` inside for each file in the bucket.
 
 This is how it looks, there is no style added to it since the focus here is to learn about the presigned URL and multipart upload features and how to integrate with a front-end app: 
 
@@ -663,15 +665,15 @@ web
 
 Inside the `src` folder create a file called `api.js` and a folder `components` with the files `fileButton.js`, `fileList.js`, `uploadInput.js`. In the root folder create the `.env` file.
 
-### 4.1 .env file
+### 4.1 **.env file**
 
-The `.env` file will have just one environment variable:
+The `.env` file will have just one environment variable, the URL for our api:
 
 ```
 REACT_APP_API_URL=http://localhost:3030/api
 ```
 
-### 4.2 api.js
+### 4.2 **api.js**
 
 ```javascript
 // api.js
@@ -689,7 +691,7 @@ export const BUCKET_NAME = 'cos-tutorial-presigned';
 
 This file just exports an `axios` instance to be used for API calls and the constant `BUCKET_NAME` that holds our COS bucket name.
 
-### 4.3 fileButton.js
+### 4.3 **fileButton.js**
 
 ```javascript
 // fileButton.js
@@ -739,7 +741,7 @@ const File = ({ filename }) => {
 export default File;
 ```
 
-This component represents a file that have already been uploaded. When you click the button it will first make a request to our API to fetch the download URL, then uses this URL to download the file. It creates an `a` element in memory and we will programmatically click on it to start the download in a new tab.
+This component represents a file that have already been uploaded. When you click the button it will first make a request to our API to fetch the download URL, then uses this URL to download the file. It does this by creating an `<a>` element in memory and using its `click()` function to trigger the download.
 
 ### 4.4 fileList.js
 
@@ -950,18 +952,22 @@ function UploadInput({fileList, setFileList }) {
 export default UploadInput;
 ```
 
-This component has three parts, the first is an `input` field to attach the file, then there is a `button` that, if there is a file attached in the `input`, when clicked starts the upload logic. 
-We have two paths for the upload logic based on the file size, if the file is smaller than the `FILE_CHUNK_SIZE`, which is set to 5Mb, then we use the `singlepartUpload` function, else if the file size is bigger than 5Mb we call the `multipartUpload` function.
+This component has three parts, the first is an `input` field to attach the file, then there is a `button` that when clicked, if there is a file attached in the `input`, starts the upload logic. 
+We have two paths for the upload logic based on the file size, if the file is smaller than the `FILE_CHUNK_SIZE`, which is set to 5MB, then we use the `singlepartUpload` function, else if the file size is bigger than the chunk size we call the `multipartUpload` function.
 
-#### 4.4.1 Singlepart upload
+#### 4.4.1 **Singlepart upload**
 
-First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress which is rendered by the last part of the component, a `span` element.
+First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress. Every time the event function is called we get the current progress from the `loaded` property from the even object, multiply it by 100 and divide the result by the `total` property of the event. The result from this operation is passed to the `setUploadProgress` function from our `useState` hook that sets the value to the `uploadProgress` variable, React then re-renders the `span` element displaying the current progress.
 
-#### 4.4.1 Multipart upload
+#### 4.4.1 **Multipart upload**
 
-@todo
+It starts by calling the `getFileChunks` function to split the file into chunks and return them in an array. Then calls our API to get the upload id and the map of URLs with parts indexes, it loops through that map to create one `PUT` request for each URL and chunk part and stores these requests in an array called `promises`. It passes this array to the `Promise.all` function to parallelly start the upload of all parts. 
 
-### 4.5 App.js
+To handle upload progress with multipart upload is not as straightforward as the singlepart upload. I have created a state variable called `progressArray`, where each position is the progress of one part of the file. Every time the event is called it sets the current progress of that part to the corresponding array position, then uses the `reduce` function to sum every progress stored in the array and divides the sum by the number of parts. This way we have the correct complete file progress and can call the `setUploadProgress` like before.
+
+Once every part is uploaded, it loops through the response object to get every `ETag` returned from the upload requests to create a new map but now matching these `ETags` with a indexes starting at *1*. To finish up, calls the route to complete the multipart upload passing this map.
+
+### 4.5 **App.js**
 
 ```javascript
 // App.js
@@ -1023,7 +1029,15 @@ To run the front-end app, from the `web` folder run:
 $ npm start
 ```
 
-With both the API and the React app running you can test everything together. From here you can further customize the API, I suggest you to explore the documentation listed in the [references](#references) to learn how to use other methods from the `ibm-cos-sdk`.
+With both the API and the React app running you can test everything together. From here you can further customize the API, some ideas are:
+- When a multipart upload fails call the abort route
+- Deleting files
+- Changing file names
+- Creating buckets
+- Add style to the front-end so it doesn't look like it was build in the 90's
+- Better error handling
+
+I suggest you to explore the documentation listed below to learn how to use other methods from the `ibm-cos-sdk`.
 
 # References
 
