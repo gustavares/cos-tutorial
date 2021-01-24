@@ -44,7 +44,6 @@ TBD
   - [3.2 Routes](#32-routes)
     - [3.2.1 List files route](#321-list-files-route)
     - [3.2.2 Download and Upload routes](#322-download-and-upload-routes)
-  - [3.3 Testing the API](#33-testing-the-api)
 - [4. Front-end React application](#4-front-end-react-application)
   - [4.1 .env file](#41-env-file)
   - [4.2 api.js](#42-apijs)
@@ -55,7 +54,7 @@ TBD
 - [References](#references)
         
 
-## 1. COS instance creation
+## 1. **COS instance creation**
 
 Once logged into your IBM Cloud account, type *"Object Storage"* in the search bar at the top and select the Object Storage item or follow this link: [https://cloud.ibm.com/objectstorage/create](https://cloud.ibm.com/objectstorage/create). 
 
@@ -89,7 +88,7 @@ Then on the "Create credential" modal, name your credential, click on the "Advan
 
 Later we are coming back here to copy the contents of the created credential and paste it in our `.env` file.
 
-## 2. Node setup
+## 2. **Node setup**
 
 Create a folder for your server and then create a package.json using `npm init`. I'm using the `esm --yes` option so we can use `import/export` syntax:
 
@@ -121,7 +120,7 @@ server
 └── cos.js    // handles everything related to COS
 └── .env      // holds our environment variables
 ```
-### 2.1 COS environment variables
+### 2.1 **COS environment variables**
 
 Open the `.env` file and create the following variables and copy the correspondent values from the HMAC credential created earlier.
 
@@ -140,7 +139,7 @@ You can find these values in your COS instance on IBM Cloud, clicking on the "Se
 
 *NOTE: This might be obvious but never expose your credentials! Don't forget to add the .env file to .gitignore.*
 
-#### 2.1.1 Getting the **COS_ENDPOINT** variable value
+#### 2.1.1 **Getting the COS_ENDPOINT variable value**
 
 - Back in your COS instance, click in the **"Buckets"** item on the left, then click in the bucket we created earlier.
 - On the left again, click in the **"Configuration"** item and scroll down to find the **"Endpoints"** section.
@@ -195,11 +194,11 @@ Your `package.json` should look something like this:
 }
 ```
 
-### 2.2 Enabling CORS requests and exposing the ETag header
+### 2.2 **Enabling CORS requests and exposing the ETag header**
 
 In order to use the presigned URL feature, first we need to enable CORS requests to our bucket, and for the multipart upload we need to expose the `ETag` header property. To do this we will write a simple script that will send a CORS configuration object to our bucket using the `ibm-cos-sdk`.
 
-#### 2.2.1 Configuring the COS connection object
+#### 2.2.1 **Configuring the COS connection object**
 
 - Open the `cos.js` file and import `S3` and `Credentials` classes from the `ibm-cos-sdk` and the `dotenv` module.
 - Instantiate and export an object called `cos` that receveis an instance of the `S3` class, passing a config object to the constructor like below.
@@ -226,7 +225,7 @@ export const cos = new S3({
 });
 ```
 
-#### 2.2.2 Creating the script
+#### 2.2.2 **Creating the script**
 
 - Create a file called `bucketCorsConfig.js` under the `server` folder.
 - Import the `cos` object from the `cos.js` module.
@@ -274,7 +273,7 @@ If everything was alright you will see the following message in the console:
 [OBJECT STORAGE] Configured CORS for [name of your bucket]
 ```
 
-## 3. Express API setup
+## 3. **Express API setup**
 
 Finally, let's start writing our API! In the `main.js` file, we are going to import `express` and `cors` and setup our server to listen on port `3030`. We are also adding a `/health` route just for health check.
 
@@ -312,7 +311,7 @@ Security - [https://expressjs.com/en/advanced/best-practice-security.html](https
 
 Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-performance.html](https://expressjs.com/en/advanced/best-practice-performance.html)
     
-### 3.1 COS functions
+### 3.1 **COS functions**
 
 These are the functions responsible to communicate with COS using the `ibm-cos-sdk`. We are going to create the following function in the `cos.js` file: 
 - `getPresignedUrl`
@@ -420,28 +419,28 @@ export async function abortMultipartUpload(bucket, fileName, uploadId) {
 
 We don't check for errors because we leave this resposability for the "controller layer", which wraps these function calls in a `try/catch` block like we will see in the next [section](#32-routes).
 
-#### 3.1.1 listFilesFromBucket function 
+#### 3.1.1 **listFilesFromBucket function** 
 
 From the `cos` object, we are calling the `listObjects` method from the `ibm-cos-sdk`, passing an options object with the bucket name. Then we check if the `results` object or its `Contents` property are `null`, if so we return an empty array. If there is content to be return we map the `Contents` object to get its `Key` property, which is the file name.
 
-#### 3.1.2 getPresignedUrl function
+#### 3.1.2 **getPresignedUrl function**
 From the `cos` object, we are calling the `getSignedUrl` method from the `ibm-cos-sdk`, passing the operation we want the URL to be able to do and an options object with the bucket and file names. To upload a file we are going to pass `putObject` as the operation, if we want to download a file we are going to pass `getObject`.
 
 You can also pass an `Expires` option to determine how long the URL will live, if no value is passed it defaults to 900 seconds(15 minutes). Read more about the `getSignedUrl` method: [https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property](https://ibm.github.io/ibm-cos-sdk-js/AWS/S3.html#getSignedUrl-property)
 
-#### 3.1.3 initiateMultipartUpload function
+#### 3.1.3 **initiateMultipartUpload function**
 
 This function is only being used locally by the `getPresignedUploadUrlParts` function. It receives the names of the bucket and file to return an *UploadId* that will be used to create the URLs for the all the parts of the file you want to upload.
 
-#### 3.1.4 getPresignedUploadUrlParts function
+#### 3.1.4 **getPresignedUploadUrlParts function**
 
 First calls the `initiateMultipartUpload` as explained above. Then uses the number of parts passed to it to get that many signed URLs. It returns an object with two properties, one being the *UploadId* and the other an array of objects called *parts*. Each object has the signed URL paired with the part index, starting at 1.
 
-#### 3.1.5 completeMultipartUpload function
+#### 3.1.5 **completeMultipartUpload function**
 
 This function is called when the client has finished uploading all the parts and tells the COS instance to put all of them together. It receives the bucket and file names, the *UploadId* and an array of objects where each object is the part number paired with the *ETag* that was sent back to the client from the response to the request that called the `getPresignedUploadUrlParts` function.
 
-#### 3.1.6 abortMultipartUpload function
+#### 3.1.6 **abortMultipartUpload function**
 
 To avoid any extra charges you should use this function when catching any errors during the upload. The official documentation states:
 
@@ -449,7 +448,7 @@ To avoid any extra charges you should use this function when catching any errors
 
 To read more about it, [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects#large-objects-multipart-api](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects#large-objects-multipart-api)
 
-### 3.2 Routes
+### 3.2 **Routes**
 
 These are the routes we are going to create:
 
@@ -463,7 +462,7 @@ POST   /api/buckets/:bucketName/files/:key/presigned/upload/multipart - to compl
 DELETE /api/buckets/:bucketName/files/:key/presigned/upload/multipart - to abort a multipart upload
 ```
 
-This is how the `cos.js` will look like:
+This is how the `routes.js` will look like:
 
 ```javascript
 // routes.js
@@ -490,63 +489,24 @@ router.get('/:bucketName/files', async (req, res, next) => {
     }
 }); 
 
-router.get('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
-    const { bucketName, key } = req.params;
-    const { parts } = req.query;
-
-    try {
-        const uploadIdAndParts = await getPresignedUploadUrlParts(bucketName, key, parts);
-
-        return res.status(200).json(uploadIdAndParts);
-    } catch (e) {
-        next(e);
-    }
-});
-
-router.post('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
-    const { bucketName, key } = req.params;
-    const { uploadId, partsETags } = req.body;
-
-    try {
-        await completeMultipartUpload(bucketName, key, uploadId, partsETags);
-
-        return res.status(200).json(`Multipart upload for ${key} completed successfully.`);
-    } catch (e) {
-        next(e);
-    }
-});
-
-router.delete('/:bucketName/files/:key/presigned/upload/multipart', async (req, res, next) => {
-    const { bucketName, key } = req.params;
-    const { uploadId } = req.query;
-
-    try {
-        await abortMultipartUpload(bucketName, key, uploadId);
-
-        return res.status(200).json(`Multipart upload for ${key} aborted successfully.`);
-    } catch (e) {
-        next(e);
-    }
-});
-
-router.get('/:bucketName/files/:key/presigned/upload', (req, res, next) => {
+router.get('/:bucketName/files/:fileName/presigned/upload', (req, res, next) => {
     res.locals.operation = 'putObject';
     
     next();
 }, presignedController);
 
-router.get('/:bucketName/files/:key/presigned/download', (req, res, next) => {  
+router.get('/:bucketName/files/:fileName/presigned/download', (req, res, next) => {  
     res.locals.operation = 'getObject';
     
     next();
 }, presignedController);
 
 async function presignedController(req, res, next) {
-    const { bucketName, key } = req.params;
+    const { bucketName, fileName } = req.params;
     const { operation } = res.locals;
 
     try {
-        const url = await getPresignedUrl(bucketName, key, operation);
+        const url = await getPresignedUrl(bucketName, fileName, operation);
 
         return res.status(200).json({ url });
     } catch(e) {
@@ -554,30 +514,90 @@ async function presignedController(req, res, next) {
     }
 }
 
+// MULTIPART ROUTES
+router.get('/:bucketName/files/:fileName/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, fileName } = req.params;
+    const { parts } = req.query;
+
+    try {
+        const uploadIdAndParts = await getPresignedUploadUrlParts(bucketName, fileName, parts);
+
+        return res.status(200).json(uploadIdAndParts);
+    } catch (e) {
+        next(e);
+    }
+});
+
+router.post('/:bucketName/files/:fileName/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, fileName } = req.params;
+    const { uploadId, partsETags } = req.body;
+
+    try {
+        await completeMultipartUpload(bucketName, fileName, uploadId, partsETags);
+
+        return res.status(200).json(`Multipart upload for ${fileName} completed successfully.`);
+    } catch (e) {
+        next(e);
+    }
+});
+
+router.delete('/:bucketName/files/:fileName/presigned/upload/multipart', async (req, res, next) => {
+    const { bucketName, fileName } = req.params;
+    const { uploadId } = req.query;
+
+    try {
+        await abortMultipartUpload(bucketName, fileName, uploadId);
+
+        return res.status(200).json(`Multipart upload for ${fileName} aborted successfully.`);
+    } catch (e) {
+        next(e);
+    }
+});
+
 export const bucketRoutes = router;
 ```
 
-We import the `Router` class from `expresss` and the functions `getPresignedUrl` and `listFilesFromBucket` from the `cos.js` file. From the `Router` constructor we instantiate an object `router`.@todo
+We import the `Router` class from `expresss` and the functions from the `cos.js` file. From the `Router` constructor we instantiate an object `router` that is exported at the end of the file as `bucketRoutes`.
 
-#### 3.2.1 List files route
+#### 3.2.1 **List files route**
 
+```
+GET /api/buckets/:bucketName/files
+```
 It is a simple `GET` route that receives the `bucketName` as an URL parameter that we pass in to the `listFilesFromBucket` from the `cos` module. We wrap the call in a `try/catch` block to handle any errors. If no errors occured we return the response object with a status 200 and the list of files in a JSON format.
 
-#### 3.2.2 Download and Upload routes
-
-Both will use pretty much the same code, the only difference is the operation value. So each one will have its own middleware to set those values but just a single `presignedController` function. We use the `res.locals` object property to this.
+#### 3.2.2 **Download and Upload routes**
+```
+GET /api/buckets/:bucketName/files/:key/presigned/download
+GET /api/buckets/:bucketName/files/:key/presigned/upload
+```
+Both will use pretty much the same code path, the only difference is the operation value. So each one will have its own middleware to set those values but just a single `presignedController` function. We create a property called `operation` in the `res.locals` object to store the either `putObject` or `getObject` depending of the route called.
 
 In the controller function we get the `bucket` and `fileName` from the `req.params` object and the `operation` value from the `res.locals` object that was set in the previous middleware. Then we wrap the `getPresignedUrl` function in a `try/catch` block, if an error is caught we send it to the next middlware otherwise we return the `url` in a JSON format with a status 200. 
 
-Lastly, at the end of the file export a variable called `bucketRoutes` that receives the `router` object, we need to use it in the express server later.
+#### 3.2.3 **Get multipart upload url routes**
+```
+GET /api/buckets/:bucketName/files/:key/presigned/upload/multipart
+```
+Differently from the other upload route, the client will decide to call this one depending on the file size. The minimum file size to do a multipart upload is 5MB.
+It receives the `bucketName` and `fileName`, as route parameters and the number of `parts` as a query parameter. Responds with a status `200` and an object with the upload id and an array of objects with the signed URLs paired with an index.
 
-#### 3.2.3 Get multipart upload url routes
-@todo
-#### 3.2.4 Complete multipart upload route
+#### 3.2.4 **Complete multipart upload route**
+```
+POST /api/buckets/:bucketName/files/:key/presigned/upload/multipart
+```
+This route will be called by the front-end when it finished to upload all of the parts. 
+It receives the same route parameters as the `GET` route, but also receives a body with the upload id and an array of objects with the part `ETag` paired with the corresponding index.
 
-#### 3.2.5 Abort multipart upload route
+#### 3.2.5 **Abort multipart upload route**
+```
+DELETE /api/buckets/:bucketName/files/:key/presigned/upload/multipart
+```
+This is the route to call when you need to abort a multipart upload as explained before. 
+It receives the same route parameters as the latter two routes plus the `uploadId` as a query parameter.
 
-To finish up, in the `main.js` file import the `bucketRoutes` from `routes.js` and use it as a middleware like below:
+Lastly, at the end of the file export a variable called `bucketRoutes` that receives the `router` object.
+In the `main.js` file import the `bucketRoutes` from `routes.js` and use it as a middleware like below:
 
 ```javascript
 // main.js
@@ -590,18 +610,17 @@ const app = express();
 
 app.use('/health', (req, res) => res.json('API is up and running!'));
 
-app.use('/api/buckets', bucketRoutes);
+app.use('/api/buckets', bucketRoutes); // <-- like this
 
 app.listen(PORT, () => {
     console.log(`API listening on port ${PORT}`);
 });
 ```
 
-### 3.3 Testing the API
+That's it for the API, it is ready to be used, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/). 
 
-Our API is ready to be used, you can test it using something like [Postman](https://www.postman.com/) or [Insomnia](https://insomnia.rest/). For the examples below I have used Insomnia.
-
-## 4. Front-end React application
+---
+## 4. **Front-end React application**
 
 Our front-end will be composed of two modules, the first has an `<input>` to select a file from your file system and a `<button>` to upload it, the second module is a list of the files in the bucket. 
 
