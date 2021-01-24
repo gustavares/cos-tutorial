@@ -1,8 +1,8 @@
 # Improving upload performance with multipart file upload directly from the browser to IBM Cloud Object Storage. (Node.js back-end + React front-end)
 
-Usually, applications that do file upload will send it through a server before uploading it to a storage service. 
-The problem with this approach is that you may end up with a bottleneck that causes a performance issue when you have multiple clients uploading large files at the same time.
-You can boost up the performance if the client side could upload directly to the storage service without sending the file through the server and in addition, if you have to upload a large file, you can also split it up into parts to upload them in parallel.
+Usually, applications that handle file upload will send the files from a client through a server before actually uploading them to a storage service. 
+The problem with this approach is that you may end up with a bottleneck that causes performance issues when you have multiple clients uploading large files at the same time.
+One way of removing this bottleneck is if the client side could upload directly to the storage service without sending the file through the server and, in addition, if you have to upload a large file, you can split it up into parts to upload them in parallel, boosting up the upload performance.
 To achieve this you can use [*IBM Cloud Object Storage*(COS)](https://cloud.ibm.com/docs/cloud-object-storage) service. It uses a subset of the [S3 API](https://cloud.ibm.com/docs/cloud-object-storage/api-reference?topic=cloud-object-storage-compatibility-api), which includes the [**presigned URL**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url) and [**multipart upload**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects) features. A presigned URL is a temporary link generated from your COS credentials that you can send to clients so they can do operations to specific objects without authentication, because your server has the credentials and used it to sign the URL. The client can use the URL retrieved from the server to upload/download files directly to/from a *bucket* at your COS instance.
 
 The following image shows two simple architecture drawings, the one in the left is what is usually done and the one in the right is what we are going to build:
@@ -34,7 +34,7 @@ TBD
 - [2. Node setup](#2-node-setup)
   - [2.1 COS environment variables](#21-cos-environment-variables)
     - [2.1.1 Getting the **COS_ENDPOINT** variable value](#211-getting-the-cos_endpoint-variable-value)
-  - [2.2 Enabling CORS requests to our bucket](#22-enabling-cors-requests-to-our-bucket)
+  - [2.2 Enabling CORS requests and exposing the ETag header](#22-enabling-cors-requests-to-our-bucket)
     - [2.2.1 Configuring the COS connection object](#221-configuring-the-cos-connection-object)
     - [2.2.2 Creating the script](#222-creating-the-script)
 - [3. Express API setup](#3-express-api-setup)
@@ -117,7 +117,7 @@ server
 └── main.js   // app start and express config
 └── package.json
 └── package-lock.json
-└── routes.js // holds our API routes
+└── routes.js // has our API routes, handling express middlewares
 └── cos.js    // handles everything related to COS
 └── .env      // holds our environment variables
 ```
@@ -150,11 +150,13 @@ You can find these values in your COS instance on IBM Cloud, clicking on the "Se
 
 Now we are going to install the dependencies: 
 
-- [Express](https://expressjs.com/) - to create the API
-- [IBM COS SDK for Node.js](https://www.npmjs.com/package/ibm-cos-sdk) - to easily connect to our COS instance
-- [dotenv](https://www.npmjs.com/package/dotenv) - to read environment variables from `.env` file
-- [cors](https://www.npmjs.com/package/cors) - to enable CORS requests since the front-end is a separate application
-- [Nodemon](https://www.npmjs.com/package/nodemon) - to help in development, automatically restarts the node app when file changes.
+- [Express](https://expressjs.com/) - to create the REST API
+- [IBM COS SDK for Node.js](https://www.npmjs.com/package/ibm-cos-sdk) - to easily connect to our COS instance and use its features
+- [Dotenv](https://www.npmjs.com/package/dotenv) - to read environment variables from `.env` file
+- [Cors](https://www.npmjs.com/package/cors) - to enable CORS requests since the front-end is a separate application
+- [Nodemon](https://www.npmjs.com/package/nodemon) - to help in development, automatically restarts the node app when you modify and save a file
+
+From the `server` directory, run the following command:
   
 ```
 $ npm i -S express ibm-cos-sdk dotenv cors && npm i -S -D nodemon
@@ -165,7 +167,7 @@ Then add the following line to the `scripts` section of your `package.json` file
 "dev": "nodemon index.js"
 ```
 
-Your `package.json` file should look something like this:
+Your `package.json` should look something like this:
 
 ```json
 {
@@ -176,7 +178,6 @@ Your `package.json` file should look something like this:
   "module": "main.js",
   "scripts": {
     "dev": "nodemon index.js",
-    "test": "echo \"Error: no test specified\" && exit 1"
   },
   "keywords": [],
   "author": "",
@@ -194,16 +195,16 @@ Your `package.json` file should look something like this:
 }
 ```
 
-### 2.2 Enabling CORS requests to our bucket
+### 2.2 Enabling CORS requests and exposing the ETag header
 
-In order to use the presigned URL feature, first we need to enable CORS requests to our bucket and expose the `ETag` header property, because its needed for the multipart upload. To do this we will write a simple script that will send a CORS configuration object to our bucket using the `ibm-cos-sdk`.
+In order to use the presigned URL feature, first we need to enable CORS requests to our bucket, and for the multipart upload we need to expose the `ETag` header property. To do this we will write a simple script that will send a CORS configuration object to our bucket using the `ibm-cos-sdk`.
 
 #### 2.2.1 Configuring the COS connection object
 
 - Open the `cos.js` file and import `S3` and `Credentials` classes from the `ibm-cos-sdk` and the `dotenv` module.
 - Instantiate and export an object called `cos` that receveis an instance of the `S3` class, passing a config object to the constructor like below.
   
-This file will also holds the functions to get the presigned URLs and will be used by our API.
+Later we will modify this file to hold all the functions to get the presigned URLs and complete the multipart upload, which will be used by our API.
 ```javascript
 // cos.js
 import { S3, Credentials } from 'ibm-cos-sdk';
@@ -263,7 +264,7 @@ async function enableCorsRequests(bucketName) {
 enableCorsRequests('cos-tutorial-presigned');
 ```
 
-Now you can open your terminal and navigate to your `server` directory and run the script with the following command:
+Now you can open up your terminal and navigate to your `server` directory and run the script with the following command:
 ```
 $ node -r esm bucketCorsConfig.js
 ```
@@ -295,13 +296,13 @@ app.listen(PORT, () => {
 });
 ```
 
-After saving your file, you can open up a terminal and navigate to your `server` directory and type: 
+After saving the file, from the `server` directory run the following command to run the app:
 
 ```
 $ npm run dev
 ```
 
-If everything is right, you will see the text `API listening on port 3030` on your console, and everytime you save a file you will see that the server restarts.
+If everything is right, you will see the text *"API listening on port 3030"* on your console, and everytime you save a file you will see that the server restarts.
 
 *NOTE: This is a configuration intended only for the purposes of this tutorial and should not be used in production. Please follow the best practices described in the Express website cited below if you intend to deploy it to a production environment.*
 
@@ -417,7 +418,7 @@ export async function abortMultipartUpload(bucket, fileName, uploadId) {
 }
 ```
 
-We don't check for errors because we leave this resposability for the "controller layer", which wraps these functions calls in a `try/catch` block like we will see in the next [section](#32-routes).
+We don't check for errors because we leave this resposability for the "controller layer", which wraps these function calls in a `try/catch` block like we will see in the next [section](#32-routes).
 
 #### 3.1.1 listFilesFromBucket function 
 
@@ -430,17 +431,23 @@ You can also pass an `Expires` option to determine how long the URL will live, i
 
 #### 3.1.3 initiateMultipartUpload function
 
-Initiates a multipart upload and returns the UploadId
+This function is only being used locally by the `getPresignedUploadUrlParts` function. It receives the names of the bucket and file to return an *UploadId* that will be used to create the URLs for the all the parts of the file you want to upload.
 
 #### 3.1.4 getPresignedUploadUrlParts function
 
-Initiates a multipart upload.
-Returns an object with the UploadId and a list of objects containing signed URLs and the part number related to it to be used to upload file parts.
+First calls the `initiateMultipartUpload` as explained above. Then uses the number of parts passed to it to get that many signed URLs. It returns an object with two properties, one being the *UploadId* and the other an array of objects called *parts*. Each object has the signed URL paired with the part index, starting at 1.
 
 #### 3.1.5 completeMultipartUpload function
 
+This function is called when the client has finished uploading all the parts and tells the COS instance to put all of them together. It receives the bucket and file names, the *UploadId* and an array of objects where each object is the part number paired with the *ETag* that was sent back to the client from the response to the request that called the `getPresignedUploadUrlParts` function.
+
 #### 3.1.6 abortMultipartUpload function
 
+To avoid any extra charges you should use this function when catching any errors during the upload. The official documentation states:
+
+> Incomplete multipart uploads do persist until the object is deleted or the multipart upload is aborted. If an incomplete multipart upload is not aborted, the partial upload continues to use resources. Interfaces should be designed with this point in mind, and clean up incomplete multipart uploads.
+
+To read more about it, [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects#large-objects-multipart-api](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects#large-objects-multipart-api)
 
 ### 3.2 Routes
 
@@ -550,7 +557,7 @@ async function presignedController(req, res, next) {
 export const bucketRoutes = router;
 ```
 
-We import the `Router` class from `expresss` and the functions `getPresignedUrl` and `listFilesFromBucket` from the `cos.js` file. From the `Router` constructor we instantiate an object `router`.
+We import the `Router` class from `expresss` and the functions `getPresignedUrl` and `listFilesFromBucket` from the `cos.js` file. From the `Router` constructor we instantiate an object `router`.@todo
 
 #### 3.2.1 List files route
 
@@ -565,7 +572,7 @@ In the controller function we get the `bucket` and `fileName` from the `req.para
 Lastly, at the end of the file export a variable called `bucketRoutes` that receives the `router` object, we need to use it in the express server later.
 
 #### 3.2.3 Get multipart upload url routes
-
+@todo
 #### 3.2.4 Complete multipart upload route
 
 #### 3.2.5 Abort multipart upload route
@@ -596,9 +603,9 @@ Our API is ready to be used, you can test it using something like [Postman](http
 
 ## 4. Front-end React application
 
-Our front-end will will be composed of two modules, the first being a form to select a file from your file system, the second module is a list of the files in the bucket. 
+Our front-end will be composed of two modules, the first has an `<input>` to select a file from your file system and a `<button>` to upload it, the second module is a list of the files in the bucket. 
 
-This is how it looks, there is no styled components since the focus here is to learn about the presigned URL feature and how to integrate with a front-end app: 
+This is how it looks, there is no style added to it since the focus here is to learn about the presigned URL and multipart upload features and how to integrate with a front-end app: 
 
 ![front-end-app](images/10-front-end.png)
 
@@ -1002,6 +1009,8 @@ With both the API and the React app running you can test everything together. Fr
 # References
 
 Creating a presigned URL - [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url)
+
+Multipart upload - [https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects)
 
 COS Compatibility S3 API - [https://cloud.ibm.com/apidocs/cos/cos-compatibility](https://cloud.ibm.com/apidocs/cos/cos-compatibility)
 
