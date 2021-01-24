@@ -10,7 +10,7 @@ The following image shows two simple architecture drawings, the one in the left 
 ![Architecture](images/1-architecture.png)
 
 In this tutorial you will: 
-- Setup a COS instance to store your files. 
+- Setup a COS instance to store your files and configure it to enable the presigned and multipart features. 
 - Build a [**Node.js API**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-node) to retrieve presigned URLs from the COS instance using your credentials.
 - Build a simple React front-end app to consume the API, split a file into parts if needed, and upload them to COS using the presigned URLs.
 
