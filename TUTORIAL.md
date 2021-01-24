@@ -2,7 +2,7 @@
 
 Usually, applications that handle file upload will send the files from a client through a server before actually uploading them to a storage service. 
 The problem with this approach is that you may end up with a bottleneck that causes performance issues when you have multiple clients uploading large files at the same time.
-One way of removing this bottleneck is if the client side could upload directly to the storage service without sending the file through the server and, in addition, if you have to upload a large file, you can split it up into parts to upload them in parallel, boosting up the upload performance.
+One way of removing this bottleneck is if the client side could upload directly to the storage service without sending the file through the server and, in addition, if you have to upload a large file, splitting it into parts to upload them in parallel, boosting up the upload performance.
 To achieve this you can use [IBM Cloud Object Storage(COS)](https://cloud.ibm.com/docs/cloud-object-storage) service. It uses a subset of the [S3 API](https://cloud.ibm.com/docs/cloud-object-storage/api-reference?topic=cloud-object-storage-compatibility-api), which includes the [**presigned URL**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-presign-url) and [**multipart upload**](https://cloud.ibm.com/docs/cloud-object-storage?topic=cloud-object-storage-large-objects) features. A presigned URL is a temporary link generated from your COS credentials that you can send to clients so they can do operations to specific objects without authentication, because your server has the credentials and used it to sign the URL. The client can use the URL retrieved from the server to upload/download files directly to/from a *bucket* at your COS instance.
 
 The following image shows two simple architecture drawings, the one in the left is what is usually done and the one in the right is what we are going to build:
@@ -62,7 +62,7 @@ When inside your COS instance, click on the "Buckets" item in the left, then in 
 
 ![Bucket creation](images/3-bucket-creation.png)
 
-Now, on the create bucket screen select the "Quickly get started" option clicking in the arrow pointing right.
+Now, on the create bucket screen select the "Quickly get started" option by clicking in the arrow pointing right.
 
 ![Bucket select](images/4-bucket-select.png)
 
@@ -84,9 +84,10 @@ Then on the "Create credential" modal, name your credential, click on the "Advan
 
 Later we are coming back here to copy the contents of the created credential and paste it in our `.env` file.
 
+---
 ## 2. **Node setup**
 
-Create a folder for your server and then create a package.json using `npm init`. I'm using the `esm --yes` option so we can use `import/export` syntax:
+Create a folder for your server and then create a package.json using `npm init`. I'm using the `esm --yes` option so we can use `import/export` syntax without any transpilers:
 
 ```
 $ mkdir server && cd server
@@ -116,32 +117,6 @@ server
 └── cos.js    // handles everything related to COS
 └── .env      // holds our environment variables
 ```
-### 2.1 **COS environment variables**
-
-Open the `.env` file and create the following variables and copy the correspondent values from the HMAC credential created earlier.
-
-```
-COS_ENDPOINT=<endpoint> // check the next section to get this value
-COS_APIKEYID=<api-key>
-COS_IBM_AUTH_ENDPOINT=https://iam.cloud.ibm.com/identity/token
-COS_RESOURCE_INSTANCE_ID=<resource-instance-id>
-COS_HMAC_ACCESS_KEY_ID=<access_key_id>
-COS_HMAC_SECRET_ACCESS_KEY=<secret_access_key>
-```
-
-You can find these values in your COS instance on IBM Cloud, clicking on the "Service credentials" item on the left.
-
-![HMAC copy](images/8-hmac-copy.png)
-
-*NOTE: This might be obvious but never expose your credentials! Don't forget to add the .env file to .gitignore.*
-
-#### 2.1.1 **Getting the COS_ENDPOINT variable value**
-
-- Back in your COS instance, click in the **"Buckets"** item on the left, then click in the bucket we created earlier.
-- On the left again, click in the **"Configuration"** item and scroll down to find the **"Endpoints"** section.
-- Copy the **"Public"** url to your clipboard.
-  ![Endpoint copy](images/9-endpoint-copy.png)
-- Back in your text editor, in the `.env` file, paste the endpoint value for the `COS_ENDPOINT` variable.
 
 Now we are going to install the dependencies: 
 
@@ -189,6 +164,33 @@ Your `package.json` should look something like this:
   }
 }
 ```
+
+### 2.1 **COS environment variables**
+
+Open the `.env` file, create the following variables and copy the correspondent values from the HMAC credential created earlier.
+
+```
+COS_ENDPOINT=<endpoint> // check the next section to get this value
+COS_APIKEYID=<api-key>
+COS_IBM_AUTH_ENDPOINT=https://iam.cloud.ibm.com/identity/token
+COS_RESOURCE_INSTANCE_ID=<resource-instance-id>
+COS_HMAC_ACCESS_KEY_ID=<access_key_id>
+COS_HMAC_SECRET_ACCESS_KEY=<secret_access_key>
+```
+
+You can find these values in your COS instance on IBM Cloud, clicking on the "Service credentials" item on the left.
+
+![HMAC copy](images/8-hmac-copy.png)
+
+*NOTE: This might be obvious but never expose your credentials! Don't forget to add the .env file to .gitignore.*
+
+#### 2.1.1 **Getting the COS_ENDPOINT variable value**
+
+- Back in your COS instance, click in the **"Buckets"** item on the left, then click in the bucket we created earlier.
+- On the left again, click in the **"Configuration"** item and scroll down to find the **"Endpoints"** section.
+- Copy the **"Public"** url to your clipboard.
+  ![Endpoint copy](images/9-endpoint-copy.png)
+- Back in your text editor, in the `.env` file, paste the endpoint value for the `COS_ENDPOINT` variable.
 
 ### 2.2 **Enabling CORS requests and exposing the ETag header**
 
@@ -309,7 +311,7 @@ Performance and Reliability - [https://expressjs.com/en/advanced/best-practice-p
     
 ### 3.1 **COS functions**
 
-These are the functions responsible to communicate with COS using the `ibm-cos-sdk`. We are going to create the following function in the `cos.js` file: 
+These are the functions responsible to communicate with COS using the `ibm-cos-sdk`. We are going to create the following functions in the `cos.js` file: 
 - `getPresignedUrl`
 - `listFilesFromBucket`
 - `initiateMultipartUpload`
@@ -417,7 +419,7 @@ We don't check for errors because we leave this resposability for the "controlle
 
 #### 3.1.1 **listFilesFromBucket function** 
 
-From the `cos` object, we are calling the `listObjects` method from the `ibm-cos-sdk`, passing an options object with the bucket name. Then we check if the `results` object or its `Contents` property are `null`, if so we return an empty array. If there is content to be return we map the `Contents` object to get its `Key` property, which is the file name.
+From the `cos` object, we are calling the `listObjects` method from the `ibm-cos-sdk`, passing an options object with the bucket name. Then we check if the `results` object or its `Contents` property are `null`, if so we return an empty array. If there is content to be returned we map the `Contents` object to get its `Key` property, which is the file name.
 
 #### 3.1.2 **getPresignedUrl function**
 From the `cos` object, we are calling the `getSignedUrl` method from the `ibm-cos-sdk`, passing the operation we want the URL to be able to do and an options object with the bucket and file names. To upload a file we are going to pass `putObject` as the operation, if we want to download a file we are going to pass `getObject`.
@@ -571,19 +573,19 @@ Both will use pretty much the same code path, the only difference is the operati
 
 In the controller function we get the `bucket` and `fileName` from the `req.params` object and the `operation` value from the `res.locals` object that was set in the previous middleware. Then we wrap the `getPresignedUrl` function in a `try/catch` block, if an error is caught we send it to the next middlware otherwise we return the `url` in a JSON format with a status 200. 
 
-#### 3.2.3 **Get multipart upload url routes**
+#### 3.2.3 **Get multipart upload URLs route**
 ```
 GET /api/buckets/:bucketName/files/:key/presigned/upload/multipart
 ```
 Differently from the other upload route, the client will decide to call this one depending on the file size. You can only do multipart uploads if the file is larger than 5MB.
-It receives the `bucketName` and `fileName`, as route parameters and the number of `parts` as a query parameter. Responds with a status `200` and an object with the upload id and an array of objects with the signed URLs paired with an index.
+It receives the `bucketName` and `fileName` as route parameters and the number of `parts` as a query parameter. Responds with a status `200` and an object with the upload id and an array of objects with the signed URLs paired with an index.
 
 #### 3.2.4 **Complete multipart upload route**
 ```
 POST /api/buckets/:bucketName/files/:key/presigned/upload/multipart
 ```
-This route will be called by the front-end when it finished to upload all of the parts. 
-It receives the same route parameters as the `GET` route, but also receives a body with the upload id and an array of objects with the part `ETag` paired with the corresponding index.
+This route will be called by the front-end after it finishes to upload all of the parts. 
+It receives the same route parameters as the `GET` route, but also receives a body with the upload id and an array of objects with the parts `ETags` paired with the corresponding indexes.
 
 #### 3.2.5 **Abort multipart upload route**
 ```
@@ -620,7 +622,7 @@ That's it for the API, it is ready to be used, you can test it using something l
 
 Our front-end will be composed of two modules:
 - the first has an `<input>` to select a file from your file system and a `<button>` to upload it. There is also a hidden `<span>` that will display the upload progress.
-- the second module has the bucket name on top and a `<ul>` list with one `<li>` with a `<button>` inside for each file in the bucket.
+- the second module has the bucket name on top and a `<ul>`/`<li>` list with a `<button>` for each file in the bucket.
 
 This is how it looks, there is no style added to it since the focus here is to learn about the presigned URL and multipart upload features and how to integrate with a front-end app: 
 
@@ -632,9 +634,10 @@ First we are going to create a React application using `create-react-app`. In yo
 $ npx create-react-app web
 ```
 
-It created a folder called `web` with default files to run a React app. 
+It created a folder called `web` with the default files to run a React app. 
+Inside the `src` folder create a file called `api.js` and a folder called `components` with the files `fileButton.js`, `fileList.js`, `uploadInput.js`. In the root folder create a `.env` file.
 
-Now create the following file structure from it:
+Your file structure should look like this:
 
 ```
 web
@@ -658,8 +661,6 @@ web
 └── package.json
 └── package-lock.json
 ```
-
-Inside the `src` folder create a file called `api.js` and a folder `components` with the files `fileButton.js`, `fileList.js`, `uploadInput.js`. In the root folder create the `.env` file.
 
 ### 4.1 **.env file**
 
@@ -953,7 +954,7 @@ We have two paths for the upload logic based on the file size, if the file is sm
 
 #### 4.4.1 **Singlepart upload**
 
-First it fetches the upload URL from our API then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress. Every time the event function is called we get the current progress from the `loaded` property from the even object, multiply it by 100 and divide the result by the `total` property of the event. The result from this operation is passed to the `setUploadProgress` function from our `useState` hook that sets the value to the `uploadProgress` variable, React then re-renders the `span` element displaying the current progress.
+First it fetches the upload URL from our API, then uses the URL to make a `PUT` request to upload the file. It sets up the `onUploadProgress` event to track the upload progress. Every time the event function is called we get the current progress from the `loaded` property from the even object, multiply it by 100 and divide the result by the `total` property of the event. The result from this operation is passed to the `setUploadProgress` function from our `useState` hook that sets the value to the `uploadProgress` variable, React then re-renders the `span` element displaying the current progress.
 
 #### 4.4.1 **Multipart upload**
 
@@ -961,7 +962,7 @@ It starts by calling the `getFileChunks` function to split the file into chunks 
 
 To handle upload progress with multipart upload is not as straightforward as the singlepart upload. I have created a state variable called `progressArray`, where each position is the progress of one part of the file. Every time the event is called it sets the current progress of that part to the corresponding array position, then uses the `reduce` function to sum every progress stored in the array and divides the sum by the number of parts. This way we have the correct complete file progress and can call the `setUploadProgress` like before.
 
-Once every part is uploaded, it loops through the response object to get every `ETag` returned from the upload requests to create a new map but now matching these `ETags` with a indexes starting at *1*. To finish up, calls the route to complete the multipart upload passing this map.
+Once every part is uploaded, it loops through the response object to get every `ETag` returned from the upload requests to create a new map but now matching these `ETags` with an index, starting at index *1*. To finish up, calls the route to complete the multipart upload passing the map in the body.
 
 ### 4.5 **App.js**
 
@@ -1017,7 +1018,7 @@ function App() {
 export default App;
 ```
 
-This is the main component of our application, it wraps everything and keeps the state of the `fileList` that is shared by the `FileList` and `UploadInput` components. It also uses the `useEffect` hook to fetch the files from our API when the application is first opened.
+This is the main component of our application, it wraps every component and keeps the `fileList` state that is shared by the `FileList` and `UploadInput` components. It also uses the `useEffect` hook to fetch the files from our API when the application is first opened.
 
 To run the front-end app, from the `web` folder run:
 
@@ -1034,6 +1035,8 @@ With both the API and the React app running you can test everything together. Fr
 - Better error handling
 
 I suggest you to explore the documentation listed below to learn how to use other methods from the `ibm-cos-sdk`.
+
+Again, you can find all the code in the following repository: [https://github.com/gustavares/cos-tutorial/](https://github.com/gustavares/cos-tutorial/).
 
 # References
 
