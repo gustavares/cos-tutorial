@@ -229,7 +229,7 @@ export const cos = new S3({
 
 - Create a file called `bucketCorsConfig.js` under the `server` folder.
 - Import the `cos` object from the `cos.js` module.
-- Create the `enableCorsRequests` async function, copy the implementation from below. This function sends a configuration object that enables `PUT` requests from any origins to the provided bucket. [Here](https://cloud.ibm.com/docs/cloud-object-storage-cli-plugin?topic=cloud-object-storage-cli-plugin-ic-cos-cli#ic-set-bucket-cors) you can read about the `putBucketBucketCors` method we used.
+- Create the `enableCorsRequests` async function, copy the implementation from below. This function sends a configuration object that enables `PUT` requests from any origins to the provided bucket. [Here](https://cloud.ibm.com/docs/cloud-object-storage-cli-plugin?topic=cloud-object-storage-cli-plugin-ic-cos-cli#ic-set-bucket-cors) you can read about the `putBucketCors` method we used.
 - Lastly, at the end of the file call the created method passing your bucket name, mine is `cos-tutorial-presigned`.
   
 ```javascript
