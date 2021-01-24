@@ -21,10 +21,6 @@ In this tutorial you will:
 - A text editor. I'm using [VSCode](https://code.visualstudio.com/).
 
 You can find the entire code created for the tutorial in this repo [https://github.com/gustavares/cos-tutorial/](https://github.com/gustavares/cos-tutorial/).
-  
-# Estimated time
-
-TBD
 
 # Steps
 
